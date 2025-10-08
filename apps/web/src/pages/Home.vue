@@ -1,214 +1,231 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { http } from '../api/http'
+
 import { useAuthStore } from '../stores/auth'
 
-interface QuizSummary {
-  id: number
-  title: string
-  description?: string | null
-  question_count: number
-}
-
-const loading = ref(true)
-const quizzes = ref<QuizSummary[]>([])
-const error = ref('')
 const auth = useAuthStore()
+
+const isAuthenticated = computed(() => auth.isAuthenticated)
+
+const primaryCta = computed(() =>
+  isAuthenticated.value
+    ? { label: 'Go to Dashboard', to: { name: 'dashboard' } }
+    : { label: 'Start Practicing', to: { name: 'register' } },
+)
+
+const secondaryCta = computed(() =>
+  isAuthenticated.value
+    ? { label: 'Browse Quizzes', to: { name: 'dashboard' } }
+    : { label: 'Login to Continue', to: { name: 'login' } },
+)
 
 const features = [
   {
     title: 'Comprehensive Question Bank',
-    description: 'Access thousands of carefully curated questions spanning popular LokSewa categories and difficulty levels.',
-    icon: '🧠',
+    description:
+      'Access thousands of carefully curated questions across multiple categories and difficulty levels.',
+    icon: 'book',
   },
   {
     title: 'Mock Tests',
-    description: 'Simulate exam scenarios with timed practice sets to build confidence and speed.',
-    icon: '⏱️',
+    description:
+      'Take timed mock tests that simulate real exam conditions to build confidence and speed.',
+    icon: 'users',
   },
   {
     title: 'Performance Tracking',
-    description: 'Monitor your progress over time with analytics designed to highlight improvement areas.',
-    icon: '📈',
+    description:
+      'Monitor your progress with detailed analytics and identify areas for improvement.',
+    icon: 'trophy',
   },
   {
     title: 'Detailed Results',
-    description: 'Gain detailed feedback with explanations to understand every answer choice clearly.',
-    icon: '🔍',
+    description:
+      'Get instant feedback with comprehensive result analysis and performance insights.',
+    icon: 'chart',
   },
 ]
 
-const fetchQuizzes = async () => {
-  try {
-    const { data } = await http.get<QuizSummary[]>('/quizzes')
-    quizzes.value = data
-  } catch (err) {
-    error.value = 'Unable to load quizzes right now.'
-    console.error(err)
-  } finally {
-    loading.value = false
-  }
-}
-
-const primaryCta = computed(() => {
-  if (auth.isAuthenticated) {
-    return { label: 'Go to dashboard', to: { name: 'dashboard' }, disabled: false }
-  }
-  if (quizzes.value.length > 0) {
-    return {
-      label: 'Start practicing',
-      to: { name: 'quiz', params: { id: quizzes.value[0].id } },
-      disabled: false,
-    }
-  }
-  return { label: 'Start practicing', to: { name: 'home' }, disabled: true }
-})
-
-const secondaryCta = computed(() => {
-  if (auth.isAuthenticated) {
-    return { label: 'Browse quizzes', to: { name: 'home', hash: '#quizzes' } }
-  }
-  return { label: 'Login to continue', to: { name: 'login' } }
-})
-
-onMounted(fetchQuizzes)
+const highlights = [
+  { label: 'Students practicing', value: '10k+' },
+  { label: 'Mock tests hosted', value: '320+' },
+  { label: 'Average score boost', value: '18%' },
+  { label: 'Success stories', value: '2.3k+' },
+]
 </script>
 
 <template>
-  <section class="space-y-16 pb-8">
-    <div class="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-800 text-white shadow-xl">
-      <div class="relative isolate px-6 py-16 sm:px-12 lg:grid lg:grid-cols-[3fr,2fr] lg:items-center lg:gap-12">
-        <div class="space-y-6">
-          <p class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-widest text-slate-200">
-            <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
-            Built for competitive success
-          </p>
-          <h1 class="text-4xl font-semibold leading-tight sm:text-5xl">
-            Master your competitive exams
-          </h1>
-          <p class="max-w-2xl text-base text-slate-200 sm:text-lg">
-            Practice with thousands of questions, track your progress, and ace your competitive exams with our comprehensive
-            mock test platform.
-          </p>
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <RouterLink
-              :to="primaryCta.to"
-              class="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-slate-200"
-              :class="{ 'pointer-events-none opacity-60': primaryCta.disabled }"
-            >
-              {{ primaryCta.label }}
-            </RouterLink>
-            <RouterLink
-              :to="secondaryCta.to"
-              class="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/10"
-            >
-              {{ secondaryCta.label }}
-            </RouterLink>
-          </div>
-        </div>
-        <div class="mt-10 lg:mt-0">
-          <div class="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur">
-            <dl class="grid grid-cols-2 gap-4 text-sm">
-              <div class="rounded-xl bg-white/10 p-4 text-center">
-                <dt class="text-xs uppercase tracking-widest text-slate-200">Total quizzes</dt>
-                <dd class="mt-2 text-3xl font-semibold">{{ quizzes.length || (loading ? '…' : '0') }}</dd>
-              </div>
-              <div class="rounded-xl bg-white/10 p-4 text-center">
-                <dt class="text-xs uppercase tracking-widest text-slate-200">Question bank</dt>
-                <dd class="mt-2 text-3xl font-semibold">
-                  {{ loading ? '…' : quizzes.reduce((acc, quiz) => acc + quiz.question_count, 0) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white/10 p-4 text-center">
-                <dt class="text-xs uppercase tracking-widest text-slate-200">Active users</dt>
-                <dd class="mt-2 text-3xl font-semibold">1.2k+</dd>
-              </div>
-              <div class="rounded-xl bg-white/10 p-4 text-center">
-                <dt class="text-xs uppercase tracking-widest text-slate-200">Avg. improvement</dt>
-                <dd class="mt-2 text-3xl font-semibold">18%</dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <section class="space-y-6">
-      <header class="space-y-2 text-center">
-        <h2 class="text-2xl font-semibold text-slate-900">Why choose QuizMaster?</h2>
-        <p class="mx-auto max-w-3xl text-sm text-slate-500">
-          Your preparation deserves the best resources. Unlock curated content, adaptive analytics, and a learning experience
-          tuned for the LokSewa examination pattern.
-        </p>
-      </header>
-      <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <article
-          v-for="feature in features"
-          :key="feature.title"
-          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-        >
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900/90 text-xl text-white">
-            {{ feature.icon }}
-          </div>
-          <h3 class="text-lg font-semibold text-slate-900">{{ feature.title }}</h3>
-          <p class="mt-2 text-sm text-slate-500">{{ feature.description }}</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="quizzes" class="space-y-6">
-      <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-2xl font-semibold text-slate-900">Practice categories</h2>
-          <p class="text-sm text-slate-500">Select a quiz to begin. New quizzes are added regularly.</p>
-        </div>
-        <RouterLink
-          v-if="auth.isAuthenticated"
-          :to="{ name: 'dashboard' }"
-          class="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
-        >
-          View dashboard
-        </RouterLink>
-      </header>
-
-      <div v-if="loading" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <div v-for="n in 6" :key="n" class="h-48 animate-pulse rounded-2xl border border-slate-200 bg-white"></div>
-      </div>
-
-      <p v-else-if="error" class="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-        {{ error }}
-      </p>
-
-      <div v-else class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <article
-          v-for="quiz in quizzes"
-          :key="quiz.id"
-          class="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-        >
-          <div class="space-y-3">
-            <div class="flex items-center justify-between text-xs uppercase tracking-widest text-slate-400">
-              <span>Quiz</span>
-              <span>{{ quiz.question_count }} questions</span>
-            </div>
-            <h3 class="text-xl font-semibold text-slate-900">{{ quiz.title }}</h3>
-            <p class="text-sm text-slate-500">{{ quiz.description || 'No description provided yet.' }}</p>
-          </div>
-          <RouterLink
-            :to="{ name: 'quiz', params: { id: quiz.id } }"
-            class="mt-6 inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            Start practice
+  <div class="min-h-screen bg-background text-foreground">
+    <header class="border-b border-border bg-card">
+      <div class="container mx-auto flex items-center justify-between px-4 py-4">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-secondary/20 text-secondary">
+            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 5a2 2 0 0 1 2-2h6v16H5a2 2 0 0 0-2 2Z" />
+              <path d="M21 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2Z" />
+              <path d="M12 4v16" />
+            </svg>
+          </span>
+          <RouterLink :to="{ name: 'home' }" class="text-2xl font-bold">
+            QuizMaster
           </RouterLink>
-        </article>
-        <div
-          v-if="quizzes.length === 0"
-          class="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500"
-        >
-          <p>No quizzes yet.</p>
-          <p class="mt-1">Ask an admin to create one from the dashboard.</p>
+        </div>
+        <div class="flex gap-2">
+          <RouterLink
+            :to="{ name: isAuthenticated ? 'dashboard' : 'login' }"
+            class="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+          >
+            {{ isAuthenticated ? 'Dashboard' : 'Login' }}
+          </RouterLink>
+          <RouterLink
+            v-if="!isAuthenticated"
+            :to="{ name: 'register' }"
+            class="inline-flex items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/90"
+          >
+            Sign Up
+          </RouterLink>
         </div>
       </div>
-    </section>
-  </section>
+    </header>
+
+    <main>
+      <section class="bg-card py-20 px-4">
+        <div class="container mx-auto grid max-w-6xl gap-12 lg:grid-cols-[3fr,2fr]">
+          <div class="space-y-6 text-center lg:text-left">
+            <h1 class="text-4xl font-bold leading-tight md:text-6xl">
+              Master Your Competitive Exams
+            </h1>
+            <p class="text-lg text-muted-foreground">
+              Practice with thousands of questions, track your progress, and ace your competitive exams with our comprehensive
+              mock test platform.
+            </p>
+            <div class="flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
+              <RouterLink
+                :to="primaryCta.to"
+                class="inline-flex items-center justify-center rounded-md bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground shadow-sm transition hover:bg-secondary/90"
+              >
+                {{ primaryCta.label }}
+              </RouterLink>
+              <RouterLink
+                :to="secondaryCta.to"
+                class="inline-flex items-center justify-center rounded-md border border-border px-6 py-3 text-sm font-semibold transition hover:bg-muted"
+              >
+                {{ secondaryCta.label }}
+              </RouterLink>
+            </div>
+          </div>
+
+          <dl class="grid grid-cols-2 gap-4">
+            <div
+              v-for="highlight in highlights"
+              :key="highlight.label"
+              class="rounded-lg border border-border bg-background/80 p-6 text-center shadow-sm backdrop-blur"
+            >
+              <dt class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {{ highlight.label }}
+              </dt>
+              <dd class="mt-3 text-3xl font-bold">
+                {{ highlight.value }}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="py-16 px-4">
+        <div class="container mx-auto max-w-6xl">
+          <h2 class="text-3xl font-bold text-center">Why Choose QuizMaster?</h2>
+          <p class="mt-4 text-center text-muted-foreground">
+            Discover the tools that help thousands of aspirants study smarter every day.
+          </p>
+          <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <article
+              v-for="feature in features"
+              :key="feature.title"
+              class="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+                <svg
+                  v-if="feature.icon === 'book'"
+                  class="h-7 w-7"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 5A2.5 2.5 0 0 1 6 2.5h6V19H6a2.5 2.5 0 0 0-2.5 2.5Z" />
+                  <path d="M20.5 5A2.5 2.5 0 0 0 18 2.5h-6V19h6a2.5 2.5 0 0 1 2.5 2.5Z" />
+                  <path d="M12 4v15" />
+                </svg>
+                <svg
+                  v-else-if="feature.icon === 'users'"
+                  class="h-7 w-7"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <svg
+                  v-else-if="feature.icon === 'trophy'"
+                  class="h-7 w-7"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 21h8" />
+                  <path d="M12 17a5 5 0 0 0 5-5V4H7v8a5 5 0 0 0 5 5Z" />
+                  <path d="M8 4V2h8v2" />
+                  <path d="M4 6h3v4a3 3 0 0 1-3-3Z" />
+                  <path d="M20 6h-3v4a3 3 0 0 0 3-3Z" />
+                </svg>
+                <svg
+                  v-else
+                  class="h-7 w-7"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 3v18" />
+                  <path d="M7 13v8" />
+                  <path d="M11 9v12" />
+                  <path d="M15 5v16" />
+                  <path d="M19 11v10" />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-lg font-semibold">{{ feature.title }}</h3>
+                <p class="mt-2 text-sm text-muted-foreground">{{ feature.description }}</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-border py-8 px-4">
+      <div class="container mx-auto text-center text-sm text-muted-foreground">
+        © 2024 QuizMaster. Built for competitive exam success.
+      </div>
+    </footer>
+  </div>
 </template>
