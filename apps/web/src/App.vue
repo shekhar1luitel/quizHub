@@ -7,9 +7,14 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const navLinks = computed(() => {
-  const links = [{ label: 'Home', to: { name: 'home' } }]
+  const links = [
+    { label: 'Home', to: { name: 'home' } },
+    { label: 'Categories', to: { name: 'categories' } },
+  ]
   if (auth.isAuthenticated) {
     links.push({ label: 'Dashboard', to: { name: 'dashboard' } })
+    links.push({ label: 'History', to: { name: 'history' } })
+    links.push({ label: 'Analytics', to: { name: 'analytics' } })
   }
   if (auth.isAdmin) {
     links.push({ label: 'Admin', to: { name: 'admin' } })

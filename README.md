@@ -54,10 +54,6 @@ npm run dev
 
 Open: [http://localhost:5173](http://localhost:5173)
 
-### Legacy Next.js prototype
-
-The previous Next.js prototype now lives in `legacy_frontend/`. It remains available for reference and design inspiration but is no longer wired into the tooling above.
-
 ## Next steps
 
 * Implement JWT parsing middleware and `/users/me` using token subject.
