@@ -10,7 +10,7 @@ config = context.config
 fileConfig(config.config_file_name)
 
 def get_url() -> str:
-    return os.getenv("DATABASE_URL", "postgresql+psycopg://quiz:quiz@localhost:5432/quizhub")
+    return os.getenv("DATABASE_URL", "postgresql+psycopg://shekhar:password@127.0.0.1:5432/quizhub")
 
 # Import metadata from models
 from app.db.base import Base  # noqa: E402
