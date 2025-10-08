@@ -1,87 +1,118 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
-interface Category {
-  id: number
+import { http } from '../api/http'
+
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Mixed'
+type DifficultyFilter = 'All' | Difficulty
+
+interface PracticeCategorySummary {
+  slug: string
+  name: string
+  total_questions: number
+  difficulty: string
+  difficulties: string[]
+}
+
+interface CategoryReference {
+  icon: string
+  description: string
+  difficulty?: Difficulty
+  subcategories: string[]
+  quizId?: number
+}
+
+interface DisplayCategory {
+  slug: string
   name: string
   icon: string
   totalQuestions: number
   completed: number
   description: string
-  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Mixed'
+  difficulty: Difficulty
   subcategories: string[]
+  quizId: number | null
 }
 
-const searchTerm = ref('')
-const selectedDifficulty = ref<'All' | Category['difficulty']>('All')
-
-const categories = ref<Category[]>([
-  {
-    id: 1,
-    name: 'General Knowledge',
+const categoryReference: Record<string, CategoryReference> = {
+  'general-knowledge': {
     icon: '🌍',
-    totalQuestions: 500,
-    completed: 45,
     description: 'World geography, history, science, and current events',
     difficulty: 'Mixed',
     subcategories: ['World Geography', 'History', 'Science', 'Sports'],
+    quizId: 1,
   },
-  {
-    id: 2,
-    name: 'Aptitude',
+  aptitude: {
     icon: '🧮',
-    totalQuestions: 300,
-    completed: 23,
     description: 'Numerical reasoning, logical thinking, and problem solving',
     difficulty: 'Medium',
     subcategories: ['Numerical', 'Logical', 'Verbal', 'Abstract'],
+    quizId: 2,
   },
-  {
-    id: 3,
-    name: 'Reasoning',
+  reasoning: {
     icon: '🧠',
-    totalQuestions: 400,
-    completed: 67,
     description: 'Logical reasoning, pattern recognition, and analytical thinking',
     difficulty: 'Hard',
     subcategories: ['Logical', 'Analytical', 'Critical', 'Spatial'],
+    quizId: 3,
   },
-  {
-    id: 4,
-    name: 'English',
+  english: {
     icon: '📚',
-    totalQuestions: 250,
-    completed: 12,
     description: 'Grammar, vocabulary, comprehension, and writing skills',
     difficulty: 'Easy',
     subcategories: ['Grammar', 'Vocabulary', 'Reading', 'Writing'],
+    quizId: 4,
   },
-  {
-    id: 5,
-    name: 'Current Affairs',
+  'current-affairs': {
     icon: '📰',
-    totalQuestions: 200,
-    completed: 8,
     description: 'Recent events, politics, economics, and social issues',
     difficulty: 'Mixed',
     subcategories: ['Politics', 'Economics', 'Technology', 'Sports'],
+    quizId: 5,
   },
-  {
-    id: 6,
-    name: 'Mathematics',
+  mathematics: {
     icon: '📊',
-    totalQuestions: 350,
-    completed: 34,
     description: 'Algebra, geometry, statistics, and advanced mathematics',
     difficulty: 'Hard',
     subcategories: ['Algebra', 'Geometry', 'Statistics', 'Calculus'],
+    quizId: 6,
   },
-])
+}
+
+const searchTerm = ref('')
+const selectedDifficulty = ref<DifficultyFilter>('All')
+const loading = ref(true)
+const error = ref('')
+const categories = ref<PracticeCategorySummary[]>([])
+
+const defaultReference: CategoryReference = {
+  icon: '📝',
+  description: 'Practice this subject to strengthen your mastery.',
+  subcategories: [],
+}
+
+const decoratedCategories = computed<DisplayCategory[]>(() =>
+  categories.value.map((category) => {
+    const reference = categoryReference[category.slug] ?? defaultReference
+    const difficulty = (reference.difficulty ?? category.difficulty ?? 'Mixed') as Difficulty
+    return {
+      slug: category.slug,
+      name: category.name,
+      icon: reference.icon,
+      totalQuestions: category.total_questions,
+      completed: 0,
+      description: reference.description,
+      difficulty,
+      subcategories: reference.subcategories,
+      quizId: reference.quizId ?? null,
+    }
+  })
+)
 
 const filteredCategories = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
-  return categories.value.filter((category) => {
+  return decoratedCategories.value.filter((category) => {
     const matchesSearch =
       !term ||
       category.name.toLowerCase().includes(term) ||
@@ -92,7 +123,7 @@ const filteredCategories = computed(() => {
   })
 })
 
-const difficultyClasses = (difficulty: Category['difficulty']) => {
+const difficultyClasses = (difficulty: Difficulty) => {
   switch (difficulty) {
     case 'Easy':
       return 'bg-emerald-100 text-emerald-800'
@@ -105,10 +136,26 @@ const difficultyClasses = (difficulty: Category['difficulty']) => {
   }
 }
 
-const progressFor = (category: Category) => {
+const progressFor = (category: DisplayCategory) => {
   if (category.totalQuestions === 0) return 0
   return Math.round((category.completed / category.totalQuestions) * 100)
 }
+
+const loadCategories = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
+    categories.value = data
+  } catch (err) {
+    error.value = 'Unable to load categories.'
+    console.error(err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadCategories)
 </script>
 
 <template>
@@ -156,17 +203,28 @@ const progressFor = (category: Category) => {
       </div>
     </header>
 
+    <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div v-for="n in 6" :key="n" class="h-64 animate-pulse rounded-3xl bg-white/60"></div>
+    </div>
+
+    <p
+      v-else-if="error"
+      class="rounded-3xl border border-red-200 bg-red-50 p-10 text-center text-sm text-red-600"
+    >
+      {{ error }}
+    </p>
+
     <div
-      v-if="filteredCategories.length === 0"
+      v-else-if="filteredCategories.length === 0"
       class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500"
     >
       No categories match your filters yet. Try a different search term.
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       <article
         v-for="category in filteredCategories"
-        :key="category.id"
+        :key="category.slug"
         class="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
       >
         <header class="flex items-start justify-between gap-3">
@@ -213,13 +271,22 @@ const progressFor = (category: Category) => {
 
         <div class="mt-auto flex gap-3 text-sm font-semibold">
           <RouterLink
-            :to="{ name: 'quiz', params: { id: category.id } }"
+            v-if="category.quizId !== null"
+            :to="{ name: 'quiz', params: { id: category.quizId } }"
             class="flex-1 rounded-full bg-slate-900 px-4 py-2 text-center text-white transition hover:bg-slate-700"
           >
             Start quiz
           </RouterLink>
+          <button
+            v-else
+            class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-center text-slate-400"
+            type="button"
+            disabled
+          >
+            Quiz coming soon
+          </button>
           <RouterLink
-            :to="{ name: 'practice', params: { id: category.id } }"
+            :to="{ name: 'practice', params: { slug: category.slug } }"
             class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-center text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
           >
             Practice

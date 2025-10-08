@@ -1,12 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 
-type Difficulty = 'Easy' | 'Medium' | 'Hard'
+import { http } from '../api/http'
 
-type PracticeQuestion = {
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Mixed'
+
+interface PracticeQuestionOption {
   id: number
-  question: string
+  text: string
+  is_correct: boolean
+}
+
+interface PracticeQuestionResponse {
+  id: number
+  prompt: string
+  explanation?: string | null
+  difficulty?: string | null
+  options: PracticeQuestionOption[]
+}
+
+interface PracticeCategoryDetail {
+  slug: string
+  name: string
+  total_questions: number
+  difficulty: string
+  questions: PracticeQuestionResponse[]
+}
+
+interface PracticeQuestionView {
+  id: number
+  prompt: string
   options: string[]
   correctAnswer: number
   explanation: string
@@ -14,39 +38,41 @@ type PracticeQuestion = {
 }
 
 const route = useRoute()
-const categoryId = computed(() => Number(route.params.id))
+const categorySlug = computed(() => String(route.params.slug || ''))
 
-const questions = ref<PracticeQuestion[]>([
-  {
-    id: 1,
-    question: 'What is the capital of France?',
-    options: ['London', 'Berlin', 'Paris', 'Madrid'],
-    correctAnswer: 2,
-    explanation: 'Paris is the capital and most populous city of France, located in the north-central part of the country.',
-    difficulty: 'Easy',
-  },
-  {
-    id: 2,
-    question: 'Which planet is known as the Red Planet?',
-    options: ['Venus', 'Mars', 'Jupiter', 'Saturn'],
-    correctAnswer: 1,
-    explanation: 'Mars gets its red colour from iron oxide, or rust, on its surface.',
-    difficulty: 'Easy',
-  },
-  {
-    id: 3,
-    question: "Who wrote the play 'Romeo and Juliet'?",
-    options: ['Charles Dickens', 'William Shakespeare', 'Jane Austen', 'Mark Twain'],
-    correctAnswer: 1,
-    explanation: "William Shakespeare wrote Romeo and Juliet, one of his most celebrated tragedies, around 1595.",
-    difficulty: 'Medium',
-  },
-])
+const category = ref<PracticeCategoryDetail | null>(null)
+const questions = ref<PracticeQuestionView[]>([])
+const loading = ref(false)
+const error = ref('')
 
 const currentIndex = ref(0)
 const selectedAnswer = ref<number | null>(null)
 const showResult = ref(false)
 const showExplanation = ref(false)
+
+const fallbackExplanation =
+  'Review the concept behind this question and try again for better mastery.'
+
+const normalizeDifficulty = (value?: string | null): Difficulty => {
+  if (!value) return 'Mixed'
+  const normalized = value.toLowerCase()
+  if (normalized.startsWith('easy')) return 'Easy'
+  if (normalized.startsWith('medium')) return 'Medium'
+  if (normalized.startsWith('hard')) return 'Hard'
+  return 'Mixed'
+}
+
+const transformQuestion = (question: PracticeQuestionResponse): PracticeQuestionView => {
+  const correctIndex = question.options.findIndex((option) => option.is_correct)
+  return {
+    id: question.id,
+    prompt: question.prompt,
+    options: question.options.map((option) => option.text),
+    correctAnswer: correctIndex >= 0 ? correctIndex : -1,
+    explanation: question.explanation?.trim() || fallbackExplanation,
+    difficulty: normalizeDifficulty(question.difficulty),
+  }
+}
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 
@@ -64,31 +90,32 @@ const submitAnswer = () => {
 const goNext = () => {
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value += 1
-    resetState()
+    resetState(false)
   }
 }
 
 const goPrev = () => {
   if (currentIndex.value > 0) {
     currentIndex.value -= 1
-    resetState()
+    resetState(false)
   }
 }
 
 const retryQuestion = () => {
-  showResult.value = false
-  showExplanation.value = false
-  selectedAnswer.value = null
+  resetState(false)
 }
 
-const resetState = () => {
+const resetState = (resetIndex = true) => {
   selectedAnswer.value = null
   showResult.value = false
   showExplanation.value = false
+  if (resetIndex) {
+    currentIndex.value = 0
+  }
 }
 
 const isCorrect = computed(
-  () => selectedAnswer.value !== null && selectedAnswer.value === currentQuestion.value.correctAnswer
+  () => selectedAnswer.value !== null && selectedAnswer.value === currentQuestion.value?.correctAnswer
 )
 
 const difficultyBadge = (difficulty: Difficulty) => {
@@ -97,10 +124,37 @@ const difficultyBadge = (difficulty: Difficulty) => {
       return 'bg-emerald-100 text-emerald-800'
     case 'Medium':
       return 'bg-amber-100 text-amber-800'
-    default:
+    case 'Hard':
       return 'bg-rose-100 text-rose-800'
+    default:
+      return 'bg-sky-100 text-sky-800'
   }
 }
+
+const loadPracticeSet = async () => {
+  if (!categorySlug.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await http.get<PracticeCategoryDetail>(`/practice/categories/${categorySlug.value}`)
+    category.value = data
+    questions.value = data.questions.map(transformQuestion)
+    resetState()
+  } catch (err) {
+    console.error(err)
+    error.value = 'Unable to load practice questions.'
+    category.value = null
+    questions.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(categorySlug, () => {
+  loadPracticeSet()
+})
+
+loadPracticeSet()
 </script>
 
 <template>
@@ -115,18 +169,41 @@ const difficultyBadge = (difficulty: Difficulty) => {
       </RouterLink>
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Practice</p>
-        <h1 class="mt-2 text-3xl font-semibold text-slate-900">Reinforcement mode</h1>
+        <h1 class="mt-2 text-3xl font-semibold text-slate-900">{{ category?.name || 'Reinforcement mode' }}</h1>
         <p class="mt-2 text-sm text-slate-500">
-          Category ID {{ categoryId || '—' }} · Question {{ currentIndex + 1 }} of {{ questions.length }}
+          {{ category?.difficulty || 'Mixed' }} focus · Question {{ questions.length ? currentIndex + 1 : 0 }} of
+          {{ questions.length }}
         </p>
       </div>
     </header>
 
-    <article class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <article v-if="loading" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="h-4 w-1/4 animate-pulse rounded bg-slate-200"></div>
+      <div class="h-6 w-3/4 animate-pulse rounded bg-slate-200"></div>
+      <div class="space-y-3">
+        <div v-for="n in 4" :key="n" class="h-12 animate-pulse rounded-2xl bg-slate-100"></div>
+      </div>
+    </article>
+
+    <p
+      v-else-if="error"
+      class="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600"
+    >
+      {{ error }}
+    </p>
+
+    <p
+      v-else-if="questions.length === 0"
+      class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
+    >
+      No practice questions are available for this category yet. Add new questions from the admin panel to get started.
+    </p>
+
+    <article v-else class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-start justify-between gap-3">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Question {{ currentIndex + 1 }}</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">{{ currentQuestion.question }}</h2>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">{{ currentQuestion.prompt }}</h2>
         </div>
         <span :class="['rounded-full px-3 py-1 text-xs font-semibold', difficultyBadge(currentQuestion.difficulty)]">
           {{ currentQuestion.difficulty }}
@@ -136,7 +213,7 @@ const difficultyBadge = (difficulty: Difficulty) => {
       <div class="space-y-3">
         <button
           v-for="(option, index) in currentQuestion.options"
-          :key="option"
+          :key="`${currentQuestion.id}-${index}`"
           class="w-full rounded-2xl border px-5 py-3 text-left text-sm transition"
           :class="[
             !showResult
@@ -159,7 +236,11 @@ const difficultyBadge = (difficulty: Difficulty) => {
         </button>
       </div>
 
-      <div v-if="showResult" class="rounded-2xl border px-5 py-4" :class="isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'">
+      <div
+        v-if="showResult"
+        class="rounded-2xl border px-5 py-4"
+        :class="isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'"
+      >
         <p class="text-sm font-semibold">{{ isCorrect ? 'Great job! That was correct.' : 'Not quite right this time.' }}</p>
       </div>
 

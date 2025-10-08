@@ -1,6 +1,9 @@
-from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+pytest.importorskip("httpx")
+from fastapi.testclient import TestClient  # noqa: E402
 
 from app.api.deps import get_db_session
 from app.main import app

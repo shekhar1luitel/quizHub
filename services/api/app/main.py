@@ -5,6 +5,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.attempts import router as attempts_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.health import router as health_router
+from app.api.routes.practice import router as practice_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.quizzes import router as quizzes_router
 from app.api.routes.users import router as users_router
@@ -24,5 +25,6 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
 app.include_router(quizzes_router, prefix="/api")
 app.include_router(questions_router, prefix="/api")
+app.include_router(practice_router, prefix="/api")
 app.include_router(attempts_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
