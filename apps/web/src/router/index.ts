@@ -4,6 +4,8 @@ import { pinia } from '../stores'
 
 const routes = [
   { path: '/', name: 'home', component: () => import('../pages/Home.vue') },
+  { path: '/categories', name: 'categories', component: () => import('../pages/Categories.vue') },
+  { path: '/practice/:id', name: 'practice', component: () => import('../pages/Practice.vue'), props: true },
   { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true },
   {
     path: '/results/:id',
@@ -16,6 +18,18 @@ const routes = [
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('../pages/Dashboard.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/history',
+    name: 'history',
+    component: () => import('../pages/History.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/analytics',
+    name: 'analytics',
+    component: () => import('../pages/Analytics.vue'),
     meta: { requiresAuth: true },
   },
   {
