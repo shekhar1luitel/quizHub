@@ -4,8 +4,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(
         min_length=8,
-        max_length=72,
-        description="Passwords must be between 8 and 72 characters to comply with bcrypt limits.",
+        max_length=256,
+        description="Passwords must be between 8 and 256 characters.",
     )
 
 class UserOut(BaseModel):

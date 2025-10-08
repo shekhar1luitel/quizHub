@@ -1,17 +1,36 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt
+import hashlib
 import jwt
-from passlib.context import CryptContext
+
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _normalized_password(password: str) -> bytes:
+    """Ensure consistent hashing input and avoid bcrypt's 72 byte limit."""
+    digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return digest.encode("ascii")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    hashed_bytes = hashed_password.encode("utf-8")
+
+    try:
+        if bcrypt.checkpw(_normalized_password(plain_password), hashed_bytes):
+            return True
+    except ValueError:
+        return False
+
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_bytes)
+    except ValueError:
+        return False
+
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_normalized_password(password), bcrypt.gensalt()).decode("ascii")
 
 def create_jwt_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
