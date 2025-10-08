@@ -1,0 +1,54 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { pinia } from '../stores'
+
+const routes = [
+  { path: '/', name: 'home', component: () => import('../pages/Home.vue') },
+  { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true },
+  {
+    path: '/results/:id',
+    name: 'results',
+    component: () => import('../pages/Results.vue'),
+    meta: { requiresAuth: true },
+    props: true,
+  },
+  {
+    path: '/dashboard',
+    name: 'dashboard',
+    component: () => import('../pages/Dashboard.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('../pages/admin/Admin.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/questions',
+    name: 'admin-questions',
+    component: () => import('../pages/admin/QuestionsCRUD.vue'),
+    meta: { requiresAdmin: true },
+  },
+  { path: '/login', name: 'login', component: () => import('../pages/auth/Login.vue') },
+  { path: '/register', name: 'register', component: () => import('../pages/auth/Register.vue') },
+]
+
+const router = createRouter({ history: createWebHistory(), routes })
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore(pinia)
+  await auth.initialize()
+
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return { name: 'home' }
+  }
+
+  return true
+})
+
+export default router
