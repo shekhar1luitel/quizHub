@@ -3,11 +3,13 @@ import os
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+from dotenv import load_dotenv
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 fileConfig(config.config_file_name)
+load_dotenv()
 
 def get_url() -> str:
     return os.getenv("DATABASE_URL", "postgresql+psycopg://quiz:quiz@localhost:5432/quizhub")
