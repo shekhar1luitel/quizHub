@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.category import CategorySummary
+
 
 class OptionBase(BaseModel):
     text: str = Field(..., min_length=1)
@@ -28,6 +30,7 @@ class QuestionBase(BaseModel):
     subject: Optional[str] = None
     difficulty: Optional[str] = None
     is_active: bool = True
+    category_id: int
 
 
 class QuestionCreate(QuestionBase):
@@ -41,10 +44,12 @@ class QuestionUpdate(BaseModel):
     difficulty: Optional[str] = None
     is_active: Optional[bool] = None
     options: Optional[List[OptionCreate]] = None
+    category_id: Optional[int] = None
 
 
 class QuestionOut(QuestionBase):
     id: int
+    category: CategorySummary
     options: List[OptionOut]
 
     model_config = {
@@ -59,6 +64,8 @@ class QuestionSummary(BaseModel):
     difficulty: Optional[str]
     is_active: bool
     option_count: int
+    category_id: int
+    category_name: str
 
     model_config = {
         "from_attributes": True,

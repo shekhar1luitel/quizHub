@@ -10,17 +10,12 @@ type DifficultyFilter = 'All' | Difficulty
 interface PracticeCategorySummary {
   slug: string
   name: string
+  description?: string | null
+  icon?: string | null
   total_questions: number
   difficulty: string
   difficulties: string[]
-}
-
-interface CategoryReference {
-  icon: string
-  description: string
-  difficulty?: Difficulty
-  subcategories: string[]
-  quizId?: number
+  quiz_id?: number | null
 }
 
 interface DisplayCategory {
@@ -28,57 +23,14 @@ interface DisplayCategory {
   name: string
   icon: string
   totalQuestions: number
-  completed: number
   description: string
   difficulty: Difficulty
-  subcategories: string[]
+  difficulties: string[]
   quizId: number | null
 }
 
-const categoryReference: Record<string, CategoryReference> = {
-  'general-knowledge': {
-    icon: '🌍',
-    description: 'World geography, history, science, and current events',
-    difficulty: 'Mixed',
-    subcategories: ['World Geography', 'History', 'Science', 'Sports'],
-    quizId: 1,
-  },
-  aptitude: {
-    icon: '🧮',
-    description: 'Numerical reasoning, logical thinking, and problem solving',
-    difficulty: 'Medium',
-    subcategories: ['Numerical', 'Logical', 'Verbal', 'Abstract'],
-    quizId: 2,
-  },
-  reasoning: {
-    icon: '🧠',
-    description: 'Logical reasoning, pattern recognition, and analytical thinking',
-    difficulty: 'Hard',
-    subcategories: ['Logical', 'Analytical', 'Critical', 'Spatial'],
-    quizId: 3,
-  },
-  english: {
-    icon: '📚',
-    description: 'Grammar, vocabulary, comprehension, and writing skills',
-    difficulty: 'Easy',
-    subcategories: ['Grammar', 'Vocabulary', 'Reading', 'Writing'],
-    quizId: 4,
-  },
-  'current-affairs': {
-    icon: '📰',
-    description: 'Recent events, politics, economics, and social issues',
-    difficulty: 'Mixed',
-    subcategories: ['Politics', 'Economics', 'Technology', 'Sports'],
-    quizId: 5,
-  },
-  mathematics: {
-    icon: '📊',
-    description: 'Algebra, geometry, statistics, and advanced mathematics',
-    difficulty: 'Hard',
-    subcategories: ['Algebra', 'Geometry', 'Statistics', 'Calculus'],
-    quizId: 6,
-  },
-}
+const fallbackDescription = 'Practice this subject to strengthen your mastery.'
+const fallbackIcon = '📝'
 
 const searchTerm = ref('')
 const selectedDifficulty = ref<DifficultyFilter>('All')
@@ -86,28 +38,26 @@ const loading = ref(true)
 const error = ref('')
 const categories = ref<PracticeCategorySummary[]>([])
 
-const defaultReference: CategoryReference = {
-  icon: '📝',
-  description: 'Practice this subject to strengthen your mastery.',
-  subcategories: [],
+const normalizeDifficulty = (value: string | null | undefined): Difficulty => {
+  if (!value) return 'Mixed'
+  const normalized = value.toLowerCase()
+  if (normalized.startsWith('easy')) return 'Easy'
+  if (normalized.startsWith('medium')) return 'Medium'
+  if (normalized.startsWith('hard')) return 'Hard'
+  return 'Mixed'
 }
 
 const decoratedCategories = computed<DisplayCategory[]>(() =>
-  categories.value.map((category) => {
-    const reference = categoryReference[category.slug] ?? defaultReference
-    const difficulty = (reference.difficulty ?? category.difficulty ?? 'Mixed') as Difficulty
-    return {
-      slug: category.slug,
-      name: category.name,
-      icon: reference.icon,
-      totalQuestions: category.total_questions,
-      completed: 0,
-      description: reference.description,
-      difficulty,
-      subcategories: reference.subcategories,
-      quizId: reference.quizId ?? null,
-    }
-  })
+  categories.value.map((category) => ({
+    slug: category.slug,
+    name: category.name,
+    icon: category.icon?.trim() || fallbackIcon,
+    totalQuestions: category.total_questions,
+    description: category.description?.trim() || fallbackDescription,
+    difficulty: normalizeDifficulty(category.difficulty),
+    difficulties: category.difficulties,
+    quizId: category.quiz_id ?? null,
+  }))
 )
 
 const filteredCategories = computed(() => {
@@ -134,11 +84,6 @@ const difficultyClasses = (difficulty: Difficulty) => {
     default:
       return 'bg-sky-100 text-sky-800'
   }
-}
-
-const progressFor = (category: DisplayCategory) => {
-  if (category.totalQuestions === 0) return 0
-  return Math.round((category.completed / category.totalQuestions) * 100)
 }
 
 const loadCategories = async () => {
@@ -237,7 +182,7 @@ onMounted(loadCategories)
                   {{ category.difficulty }}
                 </span>
                 <span>
-                  {{ category.completed }} / {{ category.totalQuestions }} completed
+                  {{ category.totalQuestions }} questions available
                 </span>
               </div>
             </div>
@@ -246,27 +191,18 @@ onMounted(loadCategories)
 
         <p class="text-sm leading-6 text-slate-600">{{ category.description }}</p>
 
-        <div class="space-y-3">
-          <div class="h-2 rounded-full bg-slate-100">
-            <div
-              class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-              :style="{ width: `${progressFor(category)}%` }"
-            />
-          </div>
-          <p class="text-xs font-medium text-slate-500">{{ progressFor(category) }}% mastery</p>
-        </div>
-
         <div>
-          <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Subcategories</h3>
-          <ul class="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Difficulty coverage</h3>
+          <ul v-if="category.difficulties.length" class="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
             <li
-              v-for="sub in category.subcategories"
-              :key="sub"
+              v-for="level in category.difficulties"
+              :key="`${category.slug}-${level}`"
               class="rounded-full border border-slate-200 px-3 py-1"
             >
-              {{ sub }}
+              {{ level }}
             </li>
           </ul>
+          <p v-else class="mt-3 text-xs text-slate-500">Mixed practice levels.</p>
         </div>
 
         <div class="mt-auto flex gap-3 text-sm font-semibold">
@@ -286,11 +222,20 @@ onMounted(loadCategories)
             Quiz coming soon
           </button>
           <RouterLink
+            v-if="category.totalQuestions > 0"
             :to="{ name: 'practice', params: { slug: category.slug } }"
             class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-center text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
           >
             Practice
           </RouterLink>
+          <button
+            v-else
+            class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-center text-slate-400"
+            type="button"
+            disabled
+          >
+            Practice coming soon
+          </button>
         </div>
       </article>
     </div>

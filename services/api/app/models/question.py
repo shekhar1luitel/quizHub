@@ -17,6 +17,9 @@ class Question(Base):
     subject: Mapped[str | None] = mapped_column(String(100))
     difficulty: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
+    )
 
     options: Mapped[List["Option"]] = relationship(
         "Option", back_populates="question", cascade="all, delete-orphan", order_by="Option.id"
@@ -24,6 +27,7 @@ class Question(Base):
     quizzes: Mapped[List["QuizQuestion"]] = relationship(
         "QuizQuestion", back_populates="question", cascade="all, delete-orphan"
     )
+    category: Mapped["Category"] = relationship("Category", back_populates="questions")
 
 
 class Option(Base):

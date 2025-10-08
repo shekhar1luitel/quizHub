@@ -8,9 +8,12 @@ from pydantic import BaseModel
 class PracticeCategorySummary(BaseModel):
     slug: str
     name: str
+    description: Optional[str]
+    icon: Optional[str]
     total_questions: int
     difficulty: str
     difficulties: List[str]
+    quiz_id: Optional[int] = None
 
 
 class PracticeQuestionOption(BaseModel):
@@ -38,6 +41,8 @@ class PracticeQuestion(BaseModel):
 class PracticeCategoryDetail(BaseModel):
     slug: str
     name: str
+    description: Optional[str]
+    icon: Optional[str]
     total_questions: int
     difficulty: str
     questions: List[PracticeQuestion]

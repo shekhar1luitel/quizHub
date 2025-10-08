@@ -43,12 +43,20 @@ onMounted(load)
             Oversee the entire quiz library, manage question quality, and keep the platform running smoothly for learners.
           </p>
         </div>
-        <RouterLink
-          :to="{ name: 'admin-questions' }"
-          class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700"
-        >
-          Add question
-        </RouterLink>
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <RouterLink
+            :to="{ name: 'admin-categories' }"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+          >
+            Manage categories
+          </RouterLink>
+          <RouterLink
+            :to="{ name: 'admin-questions' }"
+            class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700"
+          >
+            Add question
+          </RouterLink>
+        </div>
       </div>
     </header>
 

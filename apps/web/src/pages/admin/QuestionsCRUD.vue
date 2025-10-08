@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+
 import { http } from '../../api/http'
 
 interface QuestionSummary {
@@ -9,6 +11,8 @@ interface QuestionSummary {
   difficulty?: string | null
   is_active: boolean
   option_count: number
+  category_id: number
+  category_name: string
 }
 
 interface QuestionFormOption {
@@ -25,6 +29,20 @@ interface QuestionDetail {
   difficulty?: string | null
   is_active: boolean
   options: QuestionFormOption[]
+  category_id: number
+  category: {
+    id: number
+    name: string
+    slug: string
+  }
+}
+
+interface AdminCategory {
+  id: number
+  name: string
+  slug: string
+  description?: string | null
+  icon?: string | null
 }
 
 const questions = ref<QuestionSummary[]>([])
@@ -32,6 +50,9 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const editingId = ref<number | null>(null)
+const categories = ref<AdminCategory[]>([])
+const categoriesLoading = ref(false)
+const categoryError = ref('')
 
 const totalQuestions = computed(() => questions.value.length)
 const activeQuestions = computed(() => questions.value.filter((question) => question.is_active).length)
@@ -51,6 +72,7 @@ const form = reactive({
     { text: '', is_correct: false },
     { text: '', is_correct: false },
   ] as QuestionFormOption[],
+  category_id: null as number | null,
 })
 
 const resetForm = () => {
@@ -63,6 +85,7 @@ const resetForm = () => {
     { text: '', is_correct: false },
     { text: '', is_correct: false },
   ]
+  form.category_id = categories.value[0]?.id ?? null
   editingId.value = null
   success.value = ''
   error.value = ''
@@ -79,6 +102,23 @@ const loadQuestions = async () => {
     console.error(err)
   } finally {
     loading.value = false
+  }
+}
+
+const loadCategories = async () => {
+  categoriesLoading.value = true
+  categoryError.value = ''
+  try {
+    const { data } = await http.get<AdminCategory[]>('/categories')
+    categories.value = data
+    if (!form.category_id && data.length > 0) {
+      form.category_id = data[0].id
+    }
+  } catch (err) {
+    categoryError.value = 'Unable to load categories.'
+    console.error(err)
+  } finally {
+    categoriesLoading.value = false
   }
 }
 
@@ -114,6 +154,10 @@ const submit = async () => {
     error.value = 'Mark one option as the correct answer.'
     return
   }
+  if (!form.category_id) {
+    error.value = 'Select a category for this question.'
+    return
+  }
 
   const payload = {
     prompt: form.prompt,
@@ -122,6 +166,7 @@ const submit = async () => {
     difficulty: form.difficulty || null,
     is_active: form.is_active,
     options: trimmedOptions,
+    category_id: form.category_id,
   }
 
   try {
@@ -152,6 +197,7 @@ const editQuestion = async (id: number) => {
     form.difficulty = data.difficulty || ''
     form.is_active = data.is_active
     form.options = data.options.map((option) => ({ ...option }))
+    form.category_id = data.category.id
     ensureOptionCount()
   } catch (err) {
     error.value = 'Unable to load question.'
@@ -171,7 +217,9 @@ const deleteQuestion = async (id: number) => {
   }
 }
 
-loadQuestions()
+loadCategories().finally(() => {
+  loadQuestions()
+})
 </script>
 
 <template>
@@ -239,6 +287,34 @@ loadQuestions()
             class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
             placeholder="Add reasoning or references (optional)"
           ></textarea>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <label class="text-sm font-semibold text-slate-700" for="category">Category</label>
+            <RouterLink
+              :to="{ name: 'admin-categories' }"
+              class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 transition hover:text-slate-900"
+            >
+              Manage
+            </RouterLink>
+          </div>
+          <select
+            id="category"
+            v-model.number="form.category_id"
+            :disabled="categoriesLoading || categories.length === 0"
+            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            required
+          >
+            <option value="" disabled>Select a category</option>
+            <option v-for="category in categories" :key="category.id" :value="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+          <p v-if="categoriesLoading" class="text-xs text-slate-400">Loading categories…</p>
+          <p v-else-if="categoryError" class="text-xs text-red-500">{{ categoryError }}</p>
+          <p v-else-if="categories.length === 0" class="text-xs text-slate-500">
+            Create a category before adding questions.
+          </p>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="space-y-2">
@@ -310,6 +386,8 @@ loadQuestions()
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             class="inline-flex w-full items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 sm:w-auto"
+            :class="{ 'opacity-50 cursor-not-allowed': categories.length === 0 }"
+            :disabled="categories.length === 0"
             type="submit"
           >
             {{ editingId ? 'Update question' : 'Create question' }}
@@ -346,7 +424,8 @@ loadQuestions()
               <div class="space-y-1">
                 <p class="font-semibold text-slate-900">{{ question.prompt }}</p>
                 <p class="text-xs text-slate-500">
-                  {{ question.subject || 'General' }} • {{ question.difficulty || 'Unrated' }} • {{ question.option_count }} options
+                  {{ question.category_name }} • {{ question.subject || 'General' }} •
+                  {{ question.difficulty || 'Unrated' }} • {{ question.option_count }} options
                 </p>
                 <span
                   class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
