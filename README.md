@@ -7,8 +7,11 @@
 
 ## 1) Start infrastructure
 ```bash
+# ensure the Docker daemon is running first (Docker Desktop, or `sudo systemctl start docker` on Linux)
 docker compose up -d
 ```
+
+If you see an error like `Cannot connect to the Docker daemon`, start the daemon and rerun the command.
 
 ## 2) Backend setup
 
@@ -47,5 +50,3 @@ Open: [http://localhost:5173](http://localhost:5173)
 * Add Questions, Options, Quizzes, Attempts models & CRUD.
 * Wire Quiz flow: start → submit → results with explanations.
 * Protect admin routes with role-based guards.
-
-```
