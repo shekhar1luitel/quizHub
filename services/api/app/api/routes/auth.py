@@ -12,12 +12,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(data: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    try:
-        hashed_password = get_password_hash(data.password)
-    except ValueError as exc:  # pragma: no cover - defensive guard for bcrypt edge cases
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    user = User(email=data.email, hashed_password=hashed_password)
+    user = User(email=data.email, hashed_password=get_password_hash(data.password))
     db.add(user)
     db.commit()
     db.refresh(user)
