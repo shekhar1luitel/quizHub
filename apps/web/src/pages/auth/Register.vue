@@ -60,9 +60,12 @@ const submit = async () => {
           class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           placeholder="At least 8 characters"
           type="password"
-          minlength="6"
+          minlength="8"
+          maxlength="72"
           required
         />
+        <p class="text-xs text-gray-500">Use 8–72 characters to meet security requirements.</p>
+
       </div>
       <button
         class="w-full rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
