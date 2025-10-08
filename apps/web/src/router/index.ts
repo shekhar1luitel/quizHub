@@ -40,6 +40,10 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore(pinia)
   await auth.initialize()
 
+  if ((to.name === 'login' || to.name === 'register') && auth.isAuthenticated) {
+    return { name: 'dashboard' }
+  }
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
