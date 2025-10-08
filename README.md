@@ -3,7 +3,14 @@
 ## Prerequisites
 - Docker & Docker Compose
 - Node.js 22 LTS
-- Python 3.12+ (optional locally if you prefer `uv`), or just run with `uvicorn` in a venv.
+- Python 3.12+ (the backend `pyproject.toml` requires it)
+
+> ℹ️ **Ubuntu tip:** if your default `python` is still 3.10/3.11, install 3.12 once via:
+> ```bash
+> sudo apt update
+> sudo apt install python3.12 python3.12-venv
+> ```
+> then run the commands below with `python3.12` (or activate a pyenv/uv environment).
 
 ## 1) Start infrastructure
 ```bash
@@ -19,17 +26,20 @@ If you see an error like `Cannot connect to the Docker daemon`, start the daemon
 cd services/api
 # copy env and edit secrets
 cp .env.example .env
-# create venv & install (uv recommended) — or use pip if you prefer
-python -m venv .venv && source .venv/bin/activate
-pip install -U pip
-pip install -r <(python - <<'PY'
-from pathlib import Path; import tomllib; d=tomllib.loads(Path('pyproject.toml').read_text()); print('\n'.join(d['project']['dependencies']))
-PY)
+# create venv with Python 3.12 and install deps
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+pip install -r requirements.txt
 # run db migrations
 alembic upgrade head
 # run API
 uvicorn app.main:app --reload --port 8000
 ```
+
+If you accidentally run the install step with an older interpreter and see
+`ModuleNotFoundError: No module named 'tomllib'`, exit, ensure the virtual env
+is using Python **3.12+**, then rerun the install step.
 
 Open: [http://localhost:8000/health](http://localhost:8000/health)
 
