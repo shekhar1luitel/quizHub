@@ -23,6 +23,8 @@ interface PracticeQuestionResponse {
 interface PracticeCategoryDetail {
   slug: string
   name: string
+  description?: string | null
+  icon?: string | null
   total_questions: number
   difficulty: string
   questions: PracticeQuestionResponse[]
@@ -50,6 +52,10 @@ const selectedAnswer = ref<number | null>(null)
 const showResult = ref(false)
 const showExplanation = ref(false)
 
+const fallbackIcon = '📝'
+
+const fallbackDescription = 'Sharpen your understanding with targeted practice questions.'
+
 const fallbackExplanation =
   'Review the concept behind this question and try again for better mastery.'
 
@@ -75,6 +81,8 @@ const transformQuestion = (question: PracticeQuestionResponse): PracticeQuestion
 }
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
+
+const categoryIcon = computed(() => category.value?.icon?.trim() || fallbackIcon)
 
 const selectAnswer = (optionIndex: number) => {
   if (showResult.value) return
@@ -159,7 +167,7 @@ loadPracticeSet()
 
 <template>
   <section class="space-y-8">
-    <header class="flex items-start gap-4">
+    <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <RouterLink
         :to="{ name: 'categories' }"
         class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
@@ -167,13 +175,21 @@ loadPracticeSet()
         <span aria-hidden="true">←</span>
         Back to categories
       </RouterLink>
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Practice</p>
-        <h1 class="mt-2 text-3xl font-semibold text-slate-900">{{ category?.name || 'Reinforcement mode' }}</h1>
-        <p class="mt-2 text-sm text-slate-500">
-          {{ category?.difficulty || 'Mixed' }} focus · Question {{ questions.length ? currentIndex + 1 : 0 }} of
-          {{ questions.length }}
-        </p>
+      <div class="flex flex-1 items-start gap-4">
+        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900/10 text-2xl">
+          {{ categoryIcon }}
+        </span>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Practice</p>
+          <h1 class="mt-2 text-3xl font-semibold text-slate-900">{{ category?.name || 'Reinforcement mode' }}</h1>
+          <p class="mt-2 text-sm text-slate-500">
+            {{ category?.description?.trim() || fallbackDescription }}
+          </p>
+          <p class="mt-2 text-xs font-medium uppercase tracking-[0.3em] text-slate-400">
+            {{ category?.difficulty || 'Mixed' }} focus · {{ category?.total_questions ?? questions.length }} questions ·
+            Question {{ questions.length ? currentIndex + 1 : 0 }} of {{ questions.length }}
+          </p>
+        </div>
       </div>
     </header>
 

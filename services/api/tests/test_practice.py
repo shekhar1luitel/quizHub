@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.api.routes import practice as practice_routes  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.models.category import Category  # noqa: E402
 from app.models.question import Option, Question  # noqa: E402
 
 
@@ -19,6 +20,17 @@ Base.metadata.create_all(bind=engine)
 def seed_questions(db: Session) -> None:
     db.query(Option).delete()
     db.query(Question).delete()
+    db.query(Category).delete()
+
+    category = Category(
+        name="General Knowledge",
+        slug="general-knowledge",
+        description="World geography, history, science, and current events",
+        icon="🌍",
+    )
+
+    db.add(category)
+    db.flush()
 
     general_question = Question(
         prompt="Capital of Nepal is Kathmandu.",
@@ -26,6 +38,7 @@ def seed_questions(db: Session) -> None:
         subject="General Knowledge",
         difficulty="Easy",
         is_active=True,
+        category_id=category.id,
     )
     mixed_question = Question(
         prompt="Select the odd number.",
@@ -33,6 +46,7 @@ def seed_questions(db: Session) -> None:
         subject="General Knowledge",
         difficulty="Medium",
         is_active=True,
+        category_id=category.id,
     )
 
     db.add_all([general_question, mixed_question])
@@ -63,6 +77,8 @@ def test_practice_categories_reflect_active_questions():
     general = next(category for category in categories if category.slug == "general-knowledge")
     assert general.total_questions == 2
     assert general.difficulty == "Mixed"
+    assert general.icon == "🌍"
+    assert general.description is not None
 
 
 def test_practice_category_detail_returns_questions():
@@ -73,6 +89,7 @@ def test_practice_category_detail_returns_questions():
     assert detail.name == "General Knowledge"
     assert detail.total_questions == 2
     assert len(detail.questions) == 2
+    assert detail.icon == "🌍"
     assert all(len(question.options) == 4 for question in detail.questions)
     assert any(option.is_correct for option in detail.questions[0].options)
 

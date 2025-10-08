@@ -44,6 +44,12 @@ const routes = [
     component: () => import('../pages/admin/QuestionsCRUD.vue'),
     meta: { requiresAdmin: true },
   },
+  {
+    path: '/admin/categories',
+    name: 'admin-categories',
+    component: () => import('../pages/admin/CategoriesCRUD.vue'),
+    meta: { requiresAdmin: true },
+  },
   { path: '/login', name: 'login', component: () => import('../pages/auth/Login.vue') },
   { path: '/register', name: 'register', component: () => import('../pages/auth/Register.vue') },
 ]
