@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { http } from '../../api/http'
 
 interface QuestionSummary {
@@ -32,6 +32,14 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const editingId = ref<number | null>(null)
+
+const totalQuestions = computed(() => questions.value.length)
+const activeQuestions = computed(() => questions.value.filter((question) => question.is_active).length)
+const averageOptions = computed(() => {
+  if (questions.value.length === 0) return 0
+  const totalOptions = questions.value.reduce((acc, question) => acc + question.option_count, 0)
+  return Math.round((totalOptions / questions.value.length) * 10) / 10
+})
 
 const form = reactive({
   prompt: '',
@@ -167,131 +175,200 @@ loadQuestions()
 </script>
 
 <template>
-  <section class="space-y-6">
-    <header>
-      <h2 class="text-xl font-semibold text-gray-900">Question bank</h2>
-      <p class="text-sm text-gray-500">Add rich explanations and manage answer keys for each prompt.</p>
+  <section class="space-y-10">
+    <header class="space-y-3">
+      <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-slate-600">
+        Question bank
+      </div>
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 class="text-3xl font-semibold text-slate-900">Manage your question repository</h1>
+          <p class="max-w-2xl text-sm text-slate-500">
+            Add rich explanations, maintain difficulty balance, and ensure every mock test is accurate and up-to-date.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+          type="button"
+          @click="resetForm"
+        >
+          {{ editingId ? 'Cancel editing' : 'Reset form' }}
+        </button>
+      </div>
     </header>
 
-    <div class="grid gap-6 lg:grid-cols-2">
-      <form class="space-y-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm" @submit.prevent="submit">
-        <h3 class="text-lg font-semibold text-gray-900">{{ editingId ? 'Edit question' : 'Create question' }}</h3>
-        <div class="space-y-1">
-          <label class="text-sm font-medium text-gray-700" for="prompt">Prompt</label>
+    <div class="grid gap-5 lg:grid-cols-3">
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Total questions</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ totalQuestions }}</p>
+        <p class="mt-2 text-xs text-slate-500">Keep expanding coverage for every subject.</p>
+      </article>
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Active items</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ activeQuestions }}</p>
+        <p class="mt-2 text-xs text-slate-500">Review inactive questions to ensure relevance.</p>
+      </article>
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Avg. options</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ averageOptions.toFixed(1) }}</p>
+        <p class="mt-2 text-xs text-slate-500">Aim for four diverse answer choices.</p>
+      </article>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-[1.2fr,1fr] 2xl:grid-cols-[1.4fr,1fr]">
+      <form class="space-y-5 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg backdrop-blur" @submit.prevent="submit">
+        <header class="flex flex-col gap-1">
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ editingId ? 'Update question' : 'New question' }}</p>
+          <h2 class="text-xl font-semibold text-slate-900">{{ editingId ? 'Edit question' : 'Create question' }}</h2>
+        </header>
+        <div class="space-y-2">
+          <label class="text-sm font-semibold text-slate-700" for="prompt">Prompt</label>
           <textarea
             id="prompt"
             v-model="form.prompt"
-            class="min-h-[120px] w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            class="min-h-[140px] w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
             placeholder="Enter the question stem"
             required
           ></textarea>
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium text-gray-700" for="explanation">Explanation</label>
+        <div class="space-y-2">
+          <label class="text-sm font-semibold text-slate-700" for="explanation">Explanation</label>
           <textarea
             id="explanation"
             v-model="form.explanation"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
             placeholder="Add reasoning or references (optional)"
           ></textarea>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
-          <div class="space-y-1">
-            <label class="text-sm font-medium text-gray-700" for="subject">Subject</label>
+          <div class="space-y-2">
+            <label class="text-sm font-semibold text-slate-700" for="subject">Subject</label>
             <input
               id="subject"
               v-model="form.subject"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               placeholder="General Knowledge"
             />
           </div>
-          <div class="space-y-1">
-            <label class="text-sm font-medium text-gray-700" for="difficulty">Difficulty</label>
+          <div class="space-y-2">
+            <label class="text-sm font-semibold text-slate-700" for="difficulty">Difficulty</label>
             <input
               id="difficulty"
               v-model="form.difficulty"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               placeholder="Easy / Medium / Hard"
             />
           </div>
         </div>
-        <div class="space-y-2">
-          <p class="text-sm font-medium text-gray-700">Options</p>
-          <div v-for="(option, index) in form.options" :key="index" class="flex items-start gap-3">
-            <input
-              class="mt-2"
-              name="correctOption"
-              type="radio"
-              :checked="option.is_correct"
-              @change="markCorrect(index)"
-            />
-            <textarea
-              v-model="option.text"
-              class="min-h-[60px] flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-              placeholder="Answer option"
-              required
-            ></textarea>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-slate-700">Options</p>
             <button
-              class="mt-1 rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+              class="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
               type="button"
-              @click="removeOption(index)"
+              @click="addOption"
             >
-              Remove
+              Add option
             </button>
           </div>
-          <button
-            class="rounded border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            type="button"
-            @click="addOption"
-          >
-            Add option
-          </button>
+          <div class="space-y-3">
+            <div
+              v-for="(option, index) in form.options"
+              :key="index"
+              class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-start md:gap-4"
+            >
+              <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500 md:w-32">
+                <input
+                  class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-200"
+                  name="correctOption"
+                  type="radio"
+                  :checked="option.is_correct"
+                  @change="markCorrect(index)"
+                />
+                Correct
+              </label>
+              <textarea
+                v-model="option.text"
+                class="min-h-[80px] flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                placeholder="Answer option"
+                required
+              ></textarea>
+              <button
+                class="self-end rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                type="button"
+                @click="removeOption(index)"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <input id="is-active" v-model="form.is_active" type="checkbox" class="h-4 w-4" />
-          <label class="text-sm text-gray-700" for="is-active">Question is active</label>
-        </div>
-        <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <input id="is-active" v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-200" />
+          Question is active and can be used in quizzes
+        </label>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
-            class="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            class="inline-flex w-full items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 sm:w-auto"
             type="submit"
           >
             {{ editingId ? 'Update question' : 'Create question' }}
           </button>
           <button
-            class="text-sm text-gray-500 hover:underline"
+            class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 sm:w-auto"
             type="button"
             @click="resetForm"
           >
             Clear form
           </button>
         </div>
-        <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-        <p v-if="success" class="text-sm text-emerald-600">{{ success }}</p>
+        <p v-if="error" class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{{ error }}</p>
+        <p v-if="success" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-600">{{ success }}</p>
       </form>
 
-      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <div class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg backdrop-blur">
         <header class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-900">Existing questions</h3>
-          <span class="text-xs text-gray-500">{{ questions.length }} items</span>
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Existing questions</h2>
+            <p class="text-xs text-slate-500">{{ totalQuestions }} items</p>
+          </div>
+          <span v-if="loading" class="text-xs text-slate-400">Refreshing…</span>
         </header>
-        <p v-if="loading" class="mt-4 text-sm text-gray-500">Loading…</p>
-        <p v-else-if="questions.length === 0" class="mt-4 text-sm text-gray-500">No questions yet.</p>
-        <ul v-else class="mt-4 space-y-3 text-sm">
-          <li v-for="question in questions" :key="question.id" class="rounded border border-gray-200 p-3">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="font-medium text-gray-900">{{ question.prompt }}</p>
-                <p class="text-xs text-gray-500">
-                  {{ question.subject || '—' }} • {{ question.difficulty || '—' }} •
-                  {{ question.option_count }} options
+        <p v-if="loading" class="mt-6 text-sm text-slate-500">Loading question bank…</p>
+        <p v-else-if="questions.length === 0" class="mt-6 text-sm text-slate-500">No questions yet. Start by creating your first prompt.</p>
+        <ul v-else class="mt-6 space-y-4 text-sm">
+          <li
+            v-for="question in questions"
+            :key="question.id"
+            class="rounded-2xl border border-slate-200 p-4 shadow-sm"
+          >
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="space-y-1">
+                <p class="font-semibold text-slate-900">{{ question.prompt }}</p>
+                <p class="text-xs text-slate-500">
+                  {{ question.subject || 'General' }} • {{ question.difficulty || 'Unrated' }} • {{ question.option_count }} options
                 </p>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  :class="question.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'"
+                >
+                  <span class="inline-flex h-2 w-2 rounded-full" :class="question.is_active ? 'bg-emerald-500' : 'bg-slate-400'"></span>
+                  {{ question.is_active ? 'Active' : 'Inactive' }}
+                </span>
               </div>
-              <div class="flex gap-2">
-                <button class="text-xs font-semibold text-gray-600 hover:underline" type="button" @click="editQuestion(question.id)">
+              <div class="flex items-center gap-3">
+                <button
+                  class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                  type="button"
+                  @click="editQuestion(question.id)"
+                >
                   Edit
                 </button>
-                <button class="text-xs font-semibold text-red-600 hover:underline" type="button" @click="deleteQuestion(question.id)">
+                <button
+                  class="rounded-full border border-red-200 px-4 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                  type="button"
+                  @click="deleteQuestion(question.id)"
+                >
                   Delete
                 </button>
               </div>
