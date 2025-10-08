@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.api.routes.admin import router as admin_router
+from app.api.routes.analytics import router as analytics_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.attempts import router as attempts_router
 from app.api.routes.dashboard import router as dashboard_router
@@ -30,3 +32,5 @@ app.include_router(categories_router, prefix="/api")
 app.include_router(practice_router, prefix="/api")
 app.include_router(attempts_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")

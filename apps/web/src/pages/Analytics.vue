@@ -1,50 +1,55 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+
+import { http } from '../api/http'
 
 type Period = 'week' | 'month' | 'quarter' | 'year'
 
-type CategoryPerformance = {
+interface AnalyticsOverallStats {
+  total_tests: number
+  average_score: number
+  total_time_spent_seconds: number
+  improvement_rate: number
+  streak: number
+}
+
+interface AnalyticsCategoryPerformance {
   category: string
   tests: number
-  averageScore: number
-  bestScore: number
+  average_score: number
+  best_score: number
   improvement: number
 }
 
-const selectedPeriod = ref<Period>('month')
-
-const analytics = {
-  overallStats: {
-    totalTests: 25,
-    averageScore: 78,
-    totalTimeSpent: 15_600,
-    improvementRate: 12,
-    streak: 7,
-  },
-  categoryPerformance: [
-    { category: 'General Knowledge', tests: 8, averageScore: 82, bestScore: 95, improvement: 15 },
-    { category: 'Aptitude', tests: 6, averageScore: 75, bestScore: 88, improvement: 8 },
-    { category: 'Reasoning', tests: 5, averageScore: 85, bestScore: 92, improvement: 18 },
-    { category: 'English', tests: 3, averageScore: 68, bestScore: 78, improvement: -5 },
-    { category: 'Mathematics', tests: 3, averageScore: 72, bestScore: 85, improvement: 22 },
-  ],
-  weeklyProgress: [
-    { week: 'Week 1', tests: 3, averageScore: 65 },
-    { week: 'Week 2', tests: 5, averageScore: 72 },
-    { week: 'Week 3', tests: 4, averageScore: 78 },
-    { week: 'Week 4', tests: 6, averageScore: 82 },
-    { week: 'Week 5', tests: 7, averageScore: 85 },
-  ],
-  timeAnalysis: {
-    averageTimePerQuestion: 45,
-    fastestTest: 1200,
-    slowestTest: 2400,
-    optimalTimeRange: [30, 60],
-  },
-  strengths: ['Pattern Recognition', 'Logical Reasoning', 'World Geography'],
-  weaknesses: ['Grammar Rules', 'Mathematical Calculations', 'Current Events'],
+interface AnalyticsWeeklyProgressEntry {
+  label: string
+  tests: number
+  average_score: number
 }
+
+interface AnalyticsTimeAnalysis {
+  average_time_per_question_seconds: number
+  fastest_attempt_seconds: number
+  slowest_attempt_seconds: number
+  recommended_time_per_question_lower: number
+  recommended_time_per_question_upper: number
+}
+
+interface AnalyticsOverview {
+  generated_at: string
+  overall_stats: AnalyticsOverallStats
+  category_performance: AnalyticsCategoryPerformance[]
+  weekly_progress: AnalyticsWeeklyProgressEntry[]
+  time_analysis?: AnalyticsTimeAnalysis | null
+  strengths: string[]
+  weaknesses: string[]
+}
+
+const selectedPeriod = ref<Period>('month')
+const loading = ref(true)
+const error = ref('')
+const analytics = ref<AnalyticsOverview | null>(null)
 
 const formatDuration = (seconds: number) => {
   const hours = Math.floor(seconds / 3600)
@@ -69,10 +74,35 @@ const improvementColour = (value: number) => {
 
 const improvementPrefix = (value: number) => (value > 0 ? '+' : value < 0 ? '−' : '')
 
-const timePerQuestion = computed(() => `${analytics.timeAnalysis.averageTimePerQuestion}s`)
-const optimalTimeRange = computed(
-  () => `${analytics.timeAnalysis.optimalTimeRange[0]}s – ${analytics.timeAnalysis.optimalTimeRange[1]}s`
-)
+const loadAnalytics = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await http.get<AnalyticsOverview>('/analytics/overview')
+    analytics.value = data
+  } catch (err) {
+    console.error(err)
+    error.value = 'We were unable to load your analytics. Please try again shortly.'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadAnalytics)
+
+const overallStats = computed(() => analytics.value?.overall_stats)
+const hasData = computed(() => Boolean(analytics.value && overallStats.value?.total_tests))
+
+const timePerQuestion = computed(() => {
+  const avg = analytics.value?.time_analysis?.average_time_per_question_seconds
+  return avg ? `${avg.toFixed(1)}s` : '—'
+})
+
+const optimalTimeRange = computed(() => {
+  const analysis = analytics.value?.time_analysis
+  if (!analysis) return '—'
+  return `${analysis.recommended_time_per_question_lower.toFixed(1)}s – ${analysis.recommended_time_per_question_upper.toFixed(1)}s`
+})
 
 const periodLabel = computed(() => {
   switch (selectedPeriod.value) {
@@ -87,14 +117,27 @@ const periodLabel = computed(() => {
   }
 })
 
-const progressBarWidth = (value: number) => `${Math.min(Math.max(value, 0), 100)}%`
+const filteredWeeklyProgress = computed(() => {
+  if (!analytics.value) return []
+  const entries = analytics.value.weekly_progress
+  if (!entries.length) return []
+  const limits: Record<Period, number> = {
+    week: 1,
+    month: 4,
+    quarter: 12,
+    year: 52,
+  }
+  const limit = limits[selectedPeriod.value]
+  return entries.slice(-limit)
+})
 
-const weeklyAverage = computed(() =>
-  Math.round(
-    analytics.weeklyProgress.reduce((sum, entry) => sum + entry.averageScore, 0) /
-      analytics.weeklyProgress.length
-  )
-)
+const weeklyAverage = computed(() => {
+  if (!filteredWeeklyProgress.value.length) return 0
+  const total = filteredWeeklyProgress.value.reduce((sum, entry) => sum + entry.average_score, 0)
+  return Math.round(total / filteredWeeklyProgress.value.length)
+})
+
+const progressBarWidth = (value: number) => `${Math.min(Math.max(value, 0), 100)}%`
 </script>
 
 <template>
@@ -130,163 +173,196 @@ const weeklyAverage = computed(() =>
       </label>
     </header>
 
-    <div class="grid gap-6 lg:grid-cols-5">
+    <div v-if="loading" class="grid gap-6 lg:grid-cols-5">
+      <div v-for="n in 5" :key="n" class="h-32 animate-pulse rounded-3xl bg-white/70"></div>
+    </div>
+
+    <p v-else-if="error" class="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">{{ error }}</p>
+
+    <div v-else-if="analytics && hasData" class="grid gap-6 lg:grid-cols-5">
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Total tests</p>
-        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ analytics.overallStats.totalTests }}</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ overallStats?.total_tests }}</p>
         <p class="text-xs text-slate-500">Completed in {{ periodLabel }}</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Average score</p>
-        <p :class="['mt-3 text-3xl font-semibold', scoreColour(analytics.overallStats.averageScore)]">
-          {{ analytics.overallStats.averageScore }}%
+        <p :class="['mt-3 text-3xl font-semibold', scoreColour(overallStats?.average_score || 0)]">
+          {{ overallStats?.average_score.toFixed(1) }}%
         </p>
         <div class="mt-3 h-2 rounded-full bg-slate-100">
           <div
             class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-            :style="{ width: progressBarWidth(analytics.overallStats.averageScore) }"
+            :style="{ width: progressBarWidth(overallStats?.average_score || 0) }"
           />
         </div>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Study time</p>
-        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ formatDuration(analytics.overallStats.totalTimeSpent) }}</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ formatDuration(overallStats?.total_time_spent_seconds || 0) }}</p>
         <p class="text-xs text-slate-500">Across quizzes and practice</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Improvement</p>
-        <p :class="['mt-3 text-3xl font-semibold', improvementColour(analytics.overallStats.improvementRate)]">
-          +{{ analytics.overallStats.improvementRate }}%
+        <p :class="['mt-3 text-3xl font-semibold', improvementColour(overallStats?.improvement_rate || 0)]">
+          {{ improvementPrefix(overallStats?.improvement_rate || 0) }}{{ (overallStats?.improvement_rate || 0).toFixed(1) }}%
         </p>
-        <p class="text-xs text-slate-500">Compared to last {{ periodLabel }}</p>
+        <p class="text-xs text-slate-500">Compared with the previous period</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Study streak</p>
-        <p class="mt-3 text-3xl font-semibold text-indigo-600">{{ analytics.overallStats.streak }}</p>
-        <p class="text-xs text-slate-500">Days in a row</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Streak</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ overallStats?.streak }} days</p>
+        <p class="text-xs text-slate-500">Keep the momentum going</p>
       </article>
     </div>
 
-    <div class="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-      <section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div v-else class="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+      Complete a quiz to unlock your personal analytics.
+    </div>
+
+    <section v-if="analytics && hasData" class="grid gap-6 lg:grid-cols-[2fr,3fr]">
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <header class="flex items-center justify-between">
           <div>
             <h2 class="text-lg font-semibold text-slate-900">Category performance</h2>
-            <p class="text-xs text-slate-500">Your strongest and weakest subjects</p>
+            <p class="text-xs text-slate-500">Understand how you’re performing across subjects.</p>
           </div>
         </header>
-        <ul class="space-y-5 text-sm">
+        <p v-if="analytics.category_performance.length === 0" class="mt-6 text-sm text-slate-500">
+          We need a bit more activity before we can surface category insights.
+        </p>
+        <ul v-else class="mt-6 space-y-4 text-sm">
           <li
-            v-for="category in analytics.categoryPerformance"
-            :key="category.category"
-            class="space-y-3"
+            v-for="entry in analytics.category_performance"
+            :key="entry.category"
+            class="rounded-2xl border border-slate-200 p-4"
           >
             <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <span class="font-semibold text-slate-800">{{ category.category }}</span>
-                <span class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
-                  {{ category.tests }} tests
-                </span>
+              <div>
+                <p class="font-semibold text-slate-900">{{ entry.category }}</p>
+                <p class="text-xs text-slate-500">{{ entry.tests }} assessments</p>
               </div>
-              <div class="flex items-center gap-3">
-                <span :class="['font-semibold', scoreColour(category.averageScore)]">
-                  {{ category.averageScore }}%
-                </span>
-                <span :class="['text-xs font-semibold', improvementColour(category.improvement)]">
-                  {{ improvementPrefix(category.improvement) }}{{ Math.abs(category.improvement) }}%
-                </span>
+              <p :class="['text-lg font-semibold', scoreColour(entry.average_score)]">{{ entry.average_score.toFixed(1) }}%</p>
+            </div>
+            <div class="mt-3 grid gap-3 text-xs text-slate-500 md:grid-cols-3">
+              <div>
+                <p class="font-semibold text-slate-600">Best score</p>
+                <p>{{ entry.best_score.toFixed(1) }}%</p>
               </div>
-            </div>
-            <div class="h-2 rounded-full bg-slate-100">
-              <div
-                class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-                :style="{ width: progressBarWidth(category.averageScore) }"
-              />
-            </div>
-            <div class="flex justify-between text-xs text-slate-500">
-              <span>Avg {{ category.averageScore }}%</span>
-              <span>Best {{ category.bestScore }}%</span>
+              <div>
+                <p class="font-semibold text-slate-600">Average</p>
+                <p>{{ entry.average_score.toFixed(1) }}%</p>
+              </div>
+              <div>
+                <p class="font-semibold text-slate-600">Trend</p>
+                <p :class="improvementColour(entry.improvement)">
+                  {{ improvementPrefix(entry.improvement) }}{{ Math.abs(entry.improvement).toFixed(1) }}%
+                </p>
+              </div>
             </div>
           </li>
         </ul>
-      </section>
+      </article>
 
-      <aside class="space-y-6">
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 class="text-lg font-semibold text-slate-900">Time analysis</h2>
-          <dl class="mt-4 space-y-3 text-sm text-slate-600">
-            <div class="flex items-center justify-between">
-              <dt class="text-slate-500">Average per question</dt>
-              <dd class="font-semibold text-slate-900">{{ timePerQuestion }}</dd>
-            </div>
-            <div class="flex items-center justify-between">
-              <dt class="text-slate-500">Fastest test</dt>
-              <dd class="font-semibold text-slate-900">{{ formatDuration(analytics.timeAnalysis.fastestTest) }}</dd>
-            </div>
-            <div class="flex items-center justify-between">
-              <dt class="text-slate-500">Slowest test</dt>
-              <dd class="font-semibold text-slate-900">{{ formatDuration(analytics.timeAnalysis.slowestTest) }}</dd>
-            </div>
-            <div class="flex items-center justify-between">
-              <dt class="text-slate-500">Optimal range</dt>
-              <dd class="font-semibold text-slate-900">{{ optimalTimeRange }}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 class="text-lg font-semibold text-slate-900">Focus areas</h2>
-          <div class="mt-4 grid gap-4 text-sm text-slate-600">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Strengths</p>
-              <ul class="mt-2 space-y-2">
-                <li
-                  v-for="item in analytics.strengths"
-                  :key="item"
-                  class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-emerald-700"
-                >
-                  {{ item }}
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">Weaknesses</p>
-              <ul class="mt-2 space-y-2">
-                <li
-                  v-for="item in analytics.weaknesses"
-                  :key="item"
-                  class="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-2 text-rose-700"
-                >
-                  {{ item }}
-                </li>
-              </ul>
-            </div>
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <header class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Weekly progress</h2>
+            <p class="text-xs text-slate-500">Average score {{ periodLabel }}: {{ weeklyAverage }}%</p>
           </div>
-        </section>
-      </aside>
-    </div>
-
-    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-slate-900">Weekly progress</h2>
-          <p class="text-xs text-slate-500">Average score trend across recent weeks</p>
-        </div>
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
-          Weekly average {{ weeklyAverage }}%
+        </header>
+        <p v-if="filteredWeeklyProgress.length === 0" class="mt-6 text-sm text-slate-500">
+          Complete a few more quizzes to unlock week-by-week tracking.
         </p>
-      </header>
-      <div class="mt-6 grid gap-4 md:grid-cols-5">
-        <div
-          v-for="entry in analytics.weeklyProgress"
-          :key="entry.week"
-          class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm"
-        >
-          <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">{{ entry.week }}</p>
-          <p class="mt-3 text-2xl font-semibold text-slate-900">{{ entry.averageScore }}%</p>
-          <p class="text-xs text-slate-500">{{ entry.tests }} tests</p>
+        <ul v-else class="mt-6 space-y-3 text-sm">
+          <li
+            v-for="entry in filteredWeeklyProgress"
+            :key="entry.label"
+            class="rounded-2xl border border-slate-200 px-4 py-3"
+          >
+            <div class="flex items-center justify-between">
+              <p class="font-semibold text-slate-900">{{ entry.label }}</p>
+              <span :class="['text-sm font-semibold', scoreColour(entry.average_score)]">
+                {{ entry.average_score.toFixed(1) }}%
+              </span>
+            </div>
+            <p class="text-xs text-slate-500">{{ entry.tests }} quizzes</p>
+          </li>
+        </ul>
+      </article>
+    </section>
+
+    <section v-if="analytics && hasData" class="grid gap-6 lg:grid-cols-[2fr,3fr]">
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <header class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Time analysis</h2>
+            <p class="text-xs text-slate-500">Find your ideal pace across different quizzes.</p>
+          </div>
+        </header>
+        <div v-if="!analytics.time_analysis" class="mt-6 text-sm text-slate-500">
+          Keep attempting quizzes to unlock timing insights.
         </div>
-      </div>
+        <dl v-else class="mt-6 grid gap-4 text-sm md:grid-cols-2">
+          <div class="rounded-2xl border border-slate-200 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Average time per question</dt>
+            <dd class="mt-2 text-lg font-semibold text-slate-900">{{ timePerQuestion }}</dd>
+            <dd class="text-xs text-slate-500">Sweet spot {{ optimalTimeRange }}</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-200 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Fastest completion</dt>
+            <dd class="mt-2 text-lg font-semibold text-slate-900">
+              {{ formatDuration(analytics.time_analysis.fastest_attempt_seconds) }}
+            </dd>
+            <dd class="text-xs text-slate-500">Recorded on your quickest quiz</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-200 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Slowest completion</dt>
+            <dd class="mt-2 text-lg font-semibold text-slate-900">
+              {{ formatDuration(analytics.time_analysis.slowest_attempt_seconds) }}
+            </dd>
+            <dd class="text-xs text-slate-500">Take time to review explanations</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-200 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recommended pace</dt>
+            <dd class="mt-2 text-lg font-semibold text-slate-900">{{ optimalTimeRange }}</dd>
+            <dd class="text-xs text-slate-500">Target range for consistent accuracy</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <header class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Skill insights</h2>
+            <p class="text-xs text-slate-500">Celebrate strengths and plan your next revision session.</p>
+          </div>
+        </header>
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Strengths</h3>
+            <p v-if="analytics.strengths.length === 0" class="mt-3 text-sm text-emerald-700">
+              Keep practicing to discover your strongest topics.
+            </p>
+            <ul v-else class="mt-3 space-y-2 text-sm text-emerald-800">
+              <li v-for="skill in analytics.strengths" :key="`strength-${skill}`" class="rounded-xl bg-white/70 px-3 py-2">
+                {{ skill }}
+              </li>
+            </ul>
+          </section>
+          <section class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-500">Opportunities</h3>
+            <p v-if="analytics.weaknesses.length === 0" class="mt-3 text-sm text-amber-700">
+              No gaps detected yet. Attempt more quizzes to find areas to improve.
+            </p>
+            <ul v-else class="mt-3 space-y-2 text-sm text-amber-800">
+              <li v-for="skill in analytics.weaknesses" :key="`weakness-${skill}`" class="rounded-xl bg-white/70 px-3 py-2">
+                {{ skill }}
+              </li>
+            </ul>
+          </section>
+        </div>
+      </article>
     </section>
   </section>
 </template>
