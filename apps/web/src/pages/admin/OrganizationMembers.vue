@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { http } from '../../api/http'
@@ -50,6 +50,7 @@ const loading = ref(false)
 const error = ref('')
 const tokenSuccess = ref('')
 const generatedToken = ref<EnrollTokenResponse | null>(null)
+const isOrganizationDisabled = computed(() => organization.value?.status === 'inactive')
 
 const tokenForm = reactive({ expires_in_minutes: 1440 })
 
@@ -85,6 +86,10 @@ const loadMembers = async () => {
 const generateToken = async () => {
   tokenSuccess.value = ''
   generatedToken.value = null
+  if (isOrganizationDisabled.value) {
+    error.value = 'This organization is disabled. Enable it before issuing new enrollment tokens.'
+    return
+  }
   try {
     const { data } = await http.post<EnrollTokenResponse>(
       `/organizations/${organizationId.value}/enroll-tokens`,
@@ -128,6 +133,13 @@ onMounted(() => {
       </div>
     </header>
 
+    <p
+      v-if="isOrganizationDisabled"
+      class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+    >
+      This organization is currently disabled. Learners cannot access its quizzes or attempts until it is enabled again.
+    </p>
+
     <p v-if="error" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{{ error }}</p>
     <p v-if="tokenSuccess" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ tokenSuccess }}</p>
 
@@ -139,11 +151,19 @@ onMounted(() => {
         </p>
         <label class="mt-4 flex flex-col gap-1 text-sm text-slate-600">
           Expiration (minutes)
-          <input v-model.number="tokenForm.expires_in_minutes" class="rounded-xl border border-slate-200 px-3 py-2 text-sm" min="15" max="43200" type="number" />
+          <input
+            v-model.number="tokenForm.expires_in_minutes"
+            class="rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+            min="15"
+            max="43200"
+            type="number"
+            :disabled="isOrganizationDisabled"
+          />
         </label>
         <button
-          class="mt-4 inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          class="mt-4 inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           type="submit"
+          :disabled="isOrganizationDisabled"
         >
           Generate token
         </button>

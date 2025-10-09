@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 import { http } from '../../api/http'
 
@@ -34,6 +34,7 @@ const success = ref('')
 
 const organizations = ref<OrganizationItem[]>([])
 const orgError = ref('')
+const hasActiveOrganizations = computed(() => organizations.value.some((org) => org.status === 'active'))
 
 const filters = reactive({
   role: '',
@@ -111,9 +112,15 @@ const createUser = async () => {
     error.value = 'Password must be at least 8 characters.'
     return
   }
-  if (form.role === 'org_admin' && !form.organization_id) {
-    error.value = 'Select an organization for the admin user.'
-    return
+  if (form.role === 'org_admin') {
+    if (!hasActiveOrganizations.value) {
+      error.value = 'No active organizations are available. Enable or create one before assigning admins.'
+      return
+    }
+    if (!form.organization_id) {
+      error.value = 'Select an organization for the admin user.'
+      return
+    }
   }
 
   creating.value = true
@@ -204,7 +211,7 @@ onMounted(() => {
           <select v-model="filters.organization_id" class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
             <option value="">All</option>
             <option v-for="org in organizations" :key="org.id" :value="String(org.id)">
-              {{ org.name }}
+              {{ org.name }}{{ org.status !== 'active' ? ' (disabled)' : '' }}
             </option>
           </select>
         </label>
@@ -261,11 +268,22 @@ onMounted(() => {
             Organization
             <select v-model="form.organization_id" class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
               <option value="">Select organization</option>
-              <option v-for="org in organizations" :key="org.id" :value="String(org.id)">
-                {{ org.name }}
+              <option
+                v-for="org in organizations"
+                :key="org.id"
+                :disabled="org.status !== 'active'"
+                :value="String(org.id)"
+              >
+                {{ org.name }}{{ org.status !== 'active' ? ' (disabled)' : '' }}
               </option>
             </select>
           </label>
+          <p
+            v-if="form.role === 'org_admin' && !hasActiveOrganizations"
+            class="text-xs text-amber-600"
+          >
+            No active organizations available. Create or enable one before adding an org admin.
+          </p>
           <label class="flex items-center gap-2 text-xs text-slate-600">
             <input v-model="form.send_notification" type="checkbox" class="h-4 w-4 rounded border-slate-200 text-brand-600" />
             Send in-app notification

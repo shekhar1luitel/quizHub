@@ -49,6 +49,8 @@ class EnrollmentService:
         organization = enroll_token.organization
         if organization is None:
             raise ValueError("Organization not found for token.")
+        if organization.status != "active":
+            raise ValueError("Organization is currently disabled.")
 
         membership_stmt = (
             select(OrgMembership)

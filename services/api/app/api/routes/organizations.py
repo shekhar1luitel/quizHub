@@ -22,6 +22,7 @@ from app.schemas.organization import (
     OrganizationCreate,
     OrganizationEnrollIn,
     OrganizationOut,
+    OrganizationUpdate,
 )
 from app.services.enrollment_service import EnrollmentService
 from app.services.notification_service import NotificationService
@@ -78,6 +79,26 @@ def create_organization(
     return organization
 
 
+@router.patch("/{organization_id}", response_model=OrganizationOut)
+def update_organization(
+    organization_id: int,
+    data: OrganizationUpdate,
+    _: None = Depends(require_superuser),
+    db: Session = Depends(get_db_session),
+) -> OrganizationOut:
+    organization = db.get(Organization, organization_id)
+    if not organization:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+
+    if organization.status != data.status:
+        organization.status = data.status
+
+    db.add(organization)
+    db.commit()
+    db.refresh(organization)
+    return organization
+
+
 @router.get("/{organization_id}/members", response_model=OrgMemberListResponse)
 def list_organization_members(
     organization_id: int,
@@ -89,6 +110,8 @@ def list_organization_members(
     organization = db.get(Organization, organization_id)
     if not organization:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    if organization.status != "active" and current_user.role != "superuser":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization is disabled.")
 
     if current_user.role != "superuser":
         membership = (
@@ -153,6 +176,8 @@ def create_enroll_token(
     organization = db.get(Organization, organization_id)
     if not organization:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    if organization.status != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization is disabled.")
 
     if current_user.role != "superuser":
         membership = (

@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.difficulty import difficulty_label, normalized_difficulty
@@ -13,6 +13,7 @@ from app.api.deps import get_current_user, get_db_session
 from app.models.attempt import Attempt, AttemptAnswer
 from app.models.category import Category
 from app.models.question import Question, QuizQuestion
+from app.models.organization import Organization
 from app.models.quiz import Quiz
 from app.models.user import User
 from app.schemas.attempt import (
@@ -39,7 +40,12 @@ def submit_attempt(
             .selectinload(QuizQuestion.question)
             .selectinload(Question.options)
         )
-        .filter(Quiz.id == payload.quiz_id, Quiz.is_active.is_(True))
+        .join(Organization, Organization.id == Quiz.organization_id, isouter=True)
+        .filter(
+            Quiz.id == payload.quiz_id,
+            Quiz.is_active.is_(True),
+            or_(Quiz.organization_id.is_(None), Organization.status == "active"),
+        )
         .first()
     )
     if quiz is None:

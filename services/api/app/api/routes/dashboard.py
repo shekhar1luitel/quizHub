@@ -32,7 +32,7 @@ def get_dashboard_summary(
         db.query(Attempt)
         .options(selectinload(Attempt.quiz))
         .filter(Attempt.user_id == current_user.id)
-        .order_by(Attempt.submitted_at.desc())
+        .order_by(Attempt.finished_at.desc())
         .limit(5)
         .all()
     )

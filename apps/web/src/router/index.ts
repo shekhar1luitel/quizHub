@@ -89,6 +89,12 @@ const routes = [
     meta: { requiresSuperuser: true, title: 'User Management' },
   },
   {
+    path: '/admin/organizations',
+    name: 'admin-organizations',
+    component: () => import('../pages/admin/Organizations.vue'),
+    meta: { requiresSuperuser: true, title: 'Organizations' },
+  },
+  {
     path: '/admin/settings/mail',
     name: 'admin-mail-config',
     component: () => import('../pages/admin/MailConfig.vue'),

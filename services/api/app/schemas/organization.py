@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Sequence
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -22,6 +22,10 @@ class OrganizationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class OrganizationUpdate(BaseModel):
+    status: Literal["active", "inactive"]
 
 
 class EnrollTokenCreateIn(BaseModel):

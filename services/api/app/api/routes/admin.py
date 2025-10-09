@@ -37,10 +37,26 @@ def get_admin_overview(
     _: None = Depends(require_admin),
     db: Session = Depends(get_db_session),
 ) -> AdminOverview:
+    active_org_condition = or_(Quiz.organization_id.is_(None), Organization.status == "active")
+
     totals = AdminTotals(
-        total_quizzes=int(db.scalar(select(func.count()).select_from(Quiz)) or 0),
+        total_quizzes=int(
+            db.scalar(
+                select(func.count())
+                .select_from(Quiz)
+                .join(Organization, Organization.id == Quiz.organization_id, isouter=True)
+                .where(active_org_condition)
+            ) or 0
+        ),
         active_quizzes=int(
-            db.scalar(select(func.count()).select_from(Quiz).where(Quiz.is_active.is_(True))) or 0
+            db.scalar(
+                select(func.count())
+                .select_from(Quiz)
+                .join(Organization, Organization.id == Quiz.organization_id, isouter=True)
+                .where(active_org_condition)
+                .where(Quiz.is_active.is_(True))
+            )
+            or 0
         ),
         total_questions=int(db.scalar(select(func.count()).select_from(Question)) or 0),
         inactive_questions=int(
@@ -59,6 +75,8 @@ def get_admin_overview(
             func.count(QuizQuestion.question_id).label("question_count"),
         )
         .join(QuizQuestion, QuizQuestion.quiz_id == Quiz.id, isouter=True)
+        .join(Organization, Organization.id == Quiz.organization_id, isouter=True)
+        .where(active_org_condition)
         .group_by(Quiz.id)
         .order_by(Quiz.created_at.desc())
         .limit(8)
@@ -199,6 +217,11 @@ def create_admin_user(
         organization = db.get(Organization, organization_id)
         if not organization:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+        if organization.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Organization is disabled. Reactivate it before assigning administrators.",
+            )
     else:
         organization = None
         organization_id = None

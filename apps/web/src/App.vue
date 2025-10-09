@@ -173,6 +173,14 @@ const platformLinks = computed<SidebarLink[]>(() => {
 
   return [
     {
+      label: 'Organizations',
+      to: { name: 'admin-organizations' },
+      badge: 'Tenant setup',
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.75v9a.75.75 0 0 0 .75.75h4.5v-6h4.5v6h4.5a.75.75 0 0 0 .75-.75v-9l-7.5-5.25-7.5 5.25z" />
+      `,
+    },
+    {
       label: 'User management',
       to: { name: 'admin-users' },
       badge: 'Provision access',

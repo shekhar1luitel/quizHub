@@ -156,6 +156,15 @@ def login(data: LoginIn, db: Session = Depends(get_db_session)) -> Token:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email not verified. Please verify before signing in.",
         )
+    if (
+        user.role != "superuser"
+        and user.organization is not None
+        and user.organization.status != "active"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is disabled. Please contact your administrator.",
+        )
     token = create_access_token(
         subject=str(user.id),
         role=user.role,

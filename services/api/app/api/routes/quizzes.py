@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user_optional, get_db_session, require_admin
 from app.models.question import Question, QuizQuestion
 from app.models.quiz import Quiz
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.quiz import (
     QuizCreate,
@@ -33,6 +34,8 @@ def list_quizzes(db: Session = Depends(get_db_session)) -> List[QuizSummary]:
             func.count(QuizQuestion.question_id).label("question_count"),
         )
         .join(QuizQuestion, QuizQuestion.quiz_id == Quiz.id, isouter=True)
+        .join(Organization, Organization.id == Quiz.organization_id, isouter=True)
+        .where(or_(Quiz.organization_id.is_(None), Organization.status == "active"))
         .group_by(Quiz.id)
         .order_by(Quiz.title)
     )
@@ -67,6 +70,9 @@ def get_quiz(
     )
     if quiz is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    if quiz.organization and quiz.organization.status != "active":
+        if current_user is None or current_user.role not in {"admin", "superuser"}:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     if not quiz.is_active:
         if current_user is None or current_user.role != "admin":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
