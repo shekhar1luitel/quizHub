@@ -8,6 +8,7 @@ from app.api.routes.attempts import router as attempts_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.categories import router as categories_router
 from app.api.routes.health import router as health_router
+from app.api.routes.bookmarks import router as bookmarks_router
 from app.api.routes.practice import router as practice_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.quizzes import router as quizzes_router
@@ -34,3 +35,4 @@ app.include_router(attempts_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(bookmarks_router, prefix="/api")

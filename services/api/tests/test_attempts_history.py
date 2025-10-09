@@ -16,6 +16,7 @@ from app.main import app  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.attempt import Attempt, AttemptAnswer  # noqa: E402
+from app.models.bookmark import Bookmark  # noqa: E402
 from app.models.category import Category  # noqa: E402
 from app.models.question import Option, Question, QuizQuestion  # noqa: E402
 from app.models.quiz import Quiz  # noqa: E402
@@ -59,6 +60,7 @@ def reset_database():
         session.query(Attempt).delete()
         session.query(QuizQuestion).delete()
         session.query(Option).delete()
+        session.query(Bookmark).delete()
         session.query(Question).delete()
         session.query(Category).delete()
         session.query(Quiz).delete()

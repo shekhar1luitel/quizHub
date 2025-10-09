@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Set
+from typing import Annotated, Dict, List, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -67,7 +67,7 @@ def list_practice_categories(
 @router.get("/categories/{slug}", response_model=PracticeCategoryDetail)
 def get_practice_category(
     slug: str,
-    limit: int = Query(50, ge=1, le=200),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
     db: Session = Depends(get_db_session),
 ) -> PracticeCategoryDetail:
     category = db.scalar(select(Category).where(Category.slug == slug))
