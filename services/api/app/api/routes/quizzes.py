@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_db_session, require_admin
+from app.api.deps import get_current_user_optional, get_db_session, require_admin
 from app.models.question import Question, QuizQuestion
 from app.models.quiz import Quiz
+from app.models.user import User
 from app.schemas.quiz import (
     QuizCreate,
     QuizDetail,
@@ -49,7 +50,11 @@ def list_quizzes(db: Session = Depends(get_db_session)) -> List[QuizSummary]:
 
 
 @router.get("/{quiz_id}", response_model=QuizDetail)
-def get_quiz(quiz_id: int, db: Session = Depends(get_db_session)) -> QuizDetail:
+def get_quiz(
+    quiz_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> QuizDetail:
     quiz = (
         db.query(Quiz)
         .options(
@@ -57,16 +62,21 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db_session)) -> QuizDetail:
             .selectinload(QuizQuestion.question)
             .selectinload(Question.options)
         )
-        .filter(Quiz.id == quiz_id, Quiz.is_active.is_(True))
+        .filter(Quiz.id == quiz_id)
         .first()
     )
     if quiz is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    if not quiz.is_active:
+        if current_user is None or current_user.role != "admin":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
     questions: List[QuizQuestionSchema] = []
     for link in sorted(quiz.questions, key=lambda q: q.position):
         question = link.question
-        if question is None or not question.is_active:
+        if question is None:
+            continue
+        if not question.is_active and (current_user is None or current_user.role != "admin"):
             continue
         questions.append(
             QuizQuestionSchema(

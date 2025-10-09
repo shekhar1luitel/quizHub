@@ -46,3 +46,22 @@ class AttemptResult(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+
+class AttemptHistoryEntry(BaseModel):
+    id: int
+    quiz_id: int
+    quiz_title: str
+    submitted_at: datetime
+    total_questions: int
+    correct_answers: int
+    score: float
+    duration_seconds: int
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    difficulty: str
+    type: str = "quiz"
+
+    model_config = {
+        "from_attributes": True,
+    }

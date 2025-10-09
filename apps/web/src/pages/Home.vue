@@ -89,234 +89,206 @@ const fallbackDescription = 'Sharpen your understanding with focused practice an
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground">
-    <header class="border-b border-border bg-card">
-      <div class="container mx-auto flex items-center justify-between px-4 py-4">
-        <div class="flex items-center gap-2">
-          <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-secondary/20 text-secondary">
-            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 5a2 2 0 0 1 2-2h6v16H5a2 2 0 0 0-2 2Z" />
-              <path d="M21 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2Z" />
-              <path d="M12 4v16" />
-            </svg>
-          </span>
-          <RouterLink :to="{ name: 'home' }" class="text-2xl font-bold">
-            QuizMaster
-          </RouterLink>
-        </div>
-        <div class="flex gap-2">
-          <RouterLink
-            :to="{ name: isAuthenticated ? 'dashboard' : 'login' }"
-            class="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
-          >
-            {{ isAuthenticated ? 'Dashboard' : 'Login' }}
-          </RouterLink>
-          <RouterLink
-            v-if="!isAuthenticated"
-            :to="{ name: 'register' }"
-            class="inline-flex items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/90"
-          >
-            Sign Up
-          </RouterLink>
-        </div>
-      </div>
-    </header>
-
-    <main>
-      <section class="bg-card py-20 px-4">
-        <div class="container mx-auto grid max-w-6xl gap-12 lg:grid-cols-[3fr,2fr]">
-          <div class="space-y-6 text-center lg:text-left">
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Nepal Loksewa prep</p>
-            <h1 class="text-4xl font-bold leading-tight md:text-6xl">
-              Master your competitive exams with confidence
-            </h1>
-            <p class="text-lg text-muted-foreground">
-              Access curated question banks, full-length mock tests, and personalised insights so you can focus on the topics that matter most.
-            </p>
-            <div class="flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
-              <RouterLink
-                :to="primaryCta.to"
-                class="inline-flex items-center justify-center rounded-md bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground shadow-sm transition hover:bg-secondary/90"
-              >
-                {{ primaryCta.label }}
-              </RouterLink>
-              <RouterLink
-                :to="secondaryCta.to"
-                class="inline-flex items-center justify-center rounded-md border border-border px-6 py-3 text-sm font-semibold transition hover:bg-muted"
-              >
-                {{ secondaryCta.label }}
-              </RouterLink>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <article
-                v-for="stat in [
-                  { label: 'Practice categories', value: stats.categories },
-                  { label: 'Active quizzes', value: stats.quizzes },
-                  { label: 'Questions to explore', value: stats.questions },
-                ]"
-                :key="stat.label"
-                class="rounded-lg border border-border bg-background/80 p-5 text-left shadow-sm backdrop-blur"
-              >
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{{ stat.label }}</p>
-                <p class="mt-2 text-2xl font-bold">{{ loading ? '…' : stat.value }}</p>
-              </article>
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <div v-if="loading" class="h-64 animate-pulse rounded-2xl bg-muted"></div>
-            <div v-else-if="error" class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-              {{ error }}
-            </div>
-            <div v-else class="space-y-4">
-              <article class="rounded-2xl border border-border bg-background p-6 shadow-sm">
-                <h2 class="text-base font-semibold">Latest highlights</h2>
-                <p class="mt-2 text-sm text-muted-foreground">
-                  Stay on track with fresh practice sets and quizzes sourced from the Loksewa curriculum.
-                </p>
-                <ul class="mt-4 space-y-3 text-sm text-muted-foreground">
-                  <li>• {{ stats.categories }} categories curated for daily prep</li>
-                  <li>• {{ stats.questions }} questions with detailed explanations</li>
-                  <li>• {{ stats.quizzes }} mock tests ready to launch anytime</li>
-                </ul>
-              </article>
-              <article class="rounded-2xl border border-border bg-background p-6 shadow-sm">
-                <h2 class="text-base font-semibold">Quick start</h2>
-                <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
-                  <li>
-                    <RouterLink :to="{ name: 'categories' }" class="text-secondary hover:underline">Browse categories</RouterLink>
-                    to target specific topics
-                  </li>
-                  <li>
-                    <RouterLink :to="{ name: 'dashboard' }" class="text-secondary hover:underline">Visit your dashboard</RouterLink>
-                    for personalised insights
-                  </li>
-                  <li>
-                    <RouterLink :to="{ name: 'home', hash: '#quizzes' }" class="text-secondary hover:underline">Launch a mock test</RouterLink>
-                    and track your progress instantly
-                  </li>
-                </ul>
-              </article>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="!loading" class="py-16 px-4">
-        <div class="container mx-auto max-w-6xl">
-          <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Plan your practice</p>
-              <h2 class="text-3xl font-bold">Top categories right now</h2>
-              <p class="mt-2 text-sm text-muted-foreground">
-                Choose a subject to unlock targeted practice sessions tailored to your goals.
-              </p>
-            </div>
-            <RouterLink
-              :to="{ name: 'categories' }"
-              class="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-semibold transition hover:bg-muted"
-            >
-              View all categories
-            </RouterLink>
-          </header>
-
-          <div v-if="topCategories.length === 0" class="mt-10 rounded-2xl border border-border bg-background p-8 text-center text-sm text-muted-foreground">
-            Categories will appear here once they are created.
-          </div>
-          <div v-else class="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <article
-              v-for="category in topCategories"
-              :key="category.slug"
-              class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <div class="space-y-1">
-                <p class="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">{{ category.difficulty }}</p>
-                <h3 class="text-xl font-semibold">{{ category.name }}</h3>
-              </div>
-              <p class="text-sm leading-6 text-muted-foreground">
-                {{ category.description?.trim() || fallbackDescription }}
-              </p>
-              <div class="mt-auto flex items-center justify-between text-sm">
-                <span class="text-muted-foreground">{{ category.total_questions }} questions</span>
-                <RouterLink
-                  :to="{ name: 'practice', params: { slug: category.slug } }"
-                  class="inline-flex items-center gap-1 text-secondary hover:underline"
-                >
-                  Practice
-                  <span aria-hidden="true">→</span>
-                </RouterLink>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="quizzes" class="bg-muted/40 py-16 px-4">
-        <div class="container mx-auto max-w-6xl">
-          <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Mock tests</p>
-              <h2 class="text-3xl font-bold">Featured quizzes</h2>
-              <p class="mt-2 text-sm text-muted-foreground">
-                Tackle full-length practice tests designed to mirror the Loksewa experience.
-              </p>
-            </div>
-            <RouterLink
-              :to="{ name: isAuthenticated ? 'dashboard' : 'register' }"
-              class="inline-flex items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-sm transition hover:bg-secondary/90"
-            >
-              {{ isAuthenticated ? 'Open dashboard' : 'Create free account' }}
-            </RouterLink>
-          </header>
-
-          <div v-if="loading" class="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <div v-for="n in 3" :key="`quiz-skeleton-${n}`" class="h-48 animate-pulse rounded-2xl bg-card"></div>
-          </div>
-          <div v-else-if="featuredQuizzes.length === 0" class="mt-10 rounded-2xl border border-border bg-background p-8 text-center text-sm text-muted-foreground">
-            Publish your first quiz to see it featured here.
-          </div>
-          <div v-else class="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <article
-              v-for="quiz in featuredQuizzes"
-              :key="quiz.id"
-              class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <h3 class="text-xl font-semibold text-foreground">{{ quiz.title }}</h3>
-              <p class="text-sm text-muted-foreground">{{ quiz.description || 'Challenge yourself with a timed mock test.' }}</p>
-              <div class="mt-auto flex items-center justify-between text-sm text-muted-foreground">
-                <span>{{ quiz.question_count }} questions</span>
-                <RouterLink :to="{ name: 'quiz', params: { id: quiz.id } }" class="inline-flex items-center gap-1 text-secondary hover:underline">
-                  Start
-                  <span aria-hidden="true">→</span>
-                </RouterLink>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="py-16 px-4">
-        <div class="container mx-auto max-w-4xl rounded-3xl border border-border bg-card p-10 text-center shadow-sm">
-          <h2 class="text-3xl font-bold text-foreground">Ready to accelerate your preparation?</h2>
-          <p class="mt-4 text-sm text-muted-foreground">
-            Join thousands of aspirants who rely on QuizMaster for structured practice, real-time analytics, and exam-ready confidence.
+  <div class="space-y-16">
+    <section class="relative overflow-hidden rounded-4xl border border-slate-200 bg-white text-slate-900 shadow-glow">
+      <div class="absolute -right-28 top-0 h-56 w-56 rounded-full bg-brand-200/35 blur-3xl"></div>
+      <div class="absolute -left-16 bottom-0 h-52 w-52 rounded-full bg-emerald-200/30 blur-3xl"></div>
+      <div class="relative mx-auto grid max-w-6xl gap-12 px-6 py-16 md:px-10 lg:grid-cols-[3fr,2fr]">
+        <div class="space-y-6">
+          <p class="inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-brand-600">
+            Nepal Loksewa prep
           </p>
-          <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <h1 class="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
+            Master your competitive exams with confidence
+          </h1>
+          <p class="max-w-xl text-sm text-slate-600 md:text-base">
+            Access curated question banks, full-length mock tests, and personalised insights so you can focus on the topics that matter most.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
             <RouterLink
               :to="primaryCta.to"
-              class="inline-flex items-center justify-center rounded-md bg-secondary px-5 py-2.5 text-sm font-semibold text-secondary-foreground shadow-sm transition hover:bg-secondary/90"
+              class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-900/25 transition hover:bg-brand-500"
             >
               {{ primaryCta.label }}
+              <span aria-hidden="true">→</span>
             </RouterLink>
             <RouterLink
               :to="secondaryCta.to"
-              class="inline-flex items-center justify-center rounded-md border border-border px-5 py-2.5 text-sm font-semibold transition hover:bg-muted"
+              class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-300 hover:text-brand-600"
             >
               {{ secondaryCta.label }}
             </RouterLink>
           </div>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <article
+              v-for="stat in [
+                { label: 'Practice categories', value: stats.categories },
+                { label: 'Active quizzes', value: stats.quizzes },
+                { label: 'Questions to explore', value: stats.questions },
+              ]"
+              :key="stat.label"
+              class="rounded-2xl border border-slate-200 bg-white/80 p-4 text-left shadow-sm backdrop-blur"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">{{ stat.label }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900">{{ loading ? '…' : stat.value }}</p>
+            </article>
+          </div>
         </div>
-      </section>
-    </main>
+
+        <div class="space-y-4">
+          <div v-if="loading" class="h-64 animate-pulse rounded-3xl border border-slate-200 bg-slate-100/60"></div>
+          <div v-else-if="error" class="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+            {{ error }}
+          </div>
+          <div v-else class="space-y-4">
+            <article class="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+              <h2 class="text-base font-semibold">Latest highlights</h2>
+              <p class="mt-2 text-sm text-slate-500">
+                Stay on track with fresh practice sets and quizzes sourced from the Loksewa curriculum.
+              </p>
+              <ul class="mt-4 space-y-2 text-sm text-slate-600">
+                <li>• {{ stats.categories }} categories curated for daily prep</li>
+                <li>• {{ stats.questions }} questions with detailed explanations</li>
+                <li>• {{ stats.quizzes }} mock tests ready to launch anytime</li>
+              </ul>
+            </article>
+            <article class="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+              <h2 class="text-base font-semibold">Quick start</h2>
+              <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                <li>
+                  <RouterLink :to="{ name: 'categories' }" class="text-brand-600 underline-offset-4 hover:underline">Browse categories</RouterLink>
+                  to target specific topics
+                </li>
+                <li>
+                  <RouterLink :to="{ name: 'dashboard' }" class="text-brand-600 underline-offset-4 hover:underline">Visit your dashboard</RouterLink>
+                  for personalised insights
+                </li>
+                <li>
+                  <RouterLink :to="{ name: 'home', hash: '#quizzes' }" class="text-brand-600 underline-offset-4 hover:underline">Launch a mock test</RouterLink>
+                  and track your progress instantly
+                </li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="!loading" class="space-y-10">
+      <div class="mx-auto max-w-6xl px-6">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Plan your practice</p>
+            <h2 class="text-3xl font-semibold text-slate-900">Top categories right now</h2>
+            <p class="mt-2 text-sm text-slate-500">
+              Choose a subject to unlock targeted practice sessions tailored to your goals.
+            </p>
+          </div>
+          <RouterLink
+            :to="{ name: 'categories' }"
+            class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+          >
+            View all categories
+            <span aria-hidden="true">→</span>
+          </RouterLink>
+        </header>
+
+        <div v-if="topCategories.length === 0" class="mt-10 rounded-3xl border border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
+          Categories will appear here once they are created.
+        </div>
+        <div v-else class="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="category in topCategories"
+            :key="category.slug"
+            class="flex h-full flex-col gap-4 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-brand-900/5 transition hover:-translate-y-1 hover:shadow-xl"
+          >
+            <div class="space-y-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-brand-500">{{ category.difficulty }}</p>
+              <h3 class="text-xl font-semibold text-slate-900">{{ category.name }}</h3>
+            </div>
+            <p class="text-sm leading-6 text-slate-600">
+              {{ category.description?.trim() || fallbackDescription }}
+            </p>
+            <div class="mt-auto flex items-center justify-between text-sm text-slate-500">
+              <span>{{ category.total_questions }} questions</span>
+              <RouterLink
+                :to="{ name: 'practice', params: { slug: category.slug } }"
+                class="inline-flex items-center gap-1 text-brand-600 hover:underline"
+              >
+                Practice
+                <span aria-hidden="true">→</span>
+              </RouterLink>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="quizzes" class="rounded-4xl border border-slate-200 bg-white/90 p-8 shadow-xl shadow-brand-900/5 md:p-10">
+      <div class="mx-auto max-w-6xl space-y-10">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Mock tests</p>
+            <h2 class="text-3xl font-semibold text-slate-900">Featured quizzes</h2>
+            <p class="mt-2 text-sm text-slate-500">
+              Tackle full-length practice tests designed to mirror the Loksewa experience.
+            </p>
+          </div>
+          <RouterLink
+            :to="{ name: isAuthenticated ? 'dashboard' : 'register' }"
+            class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:bg-brand-500"
+          >
+            {{ isAuthenticated ? 'Open dashboard' : 'Create free account' }}
+          </RouterLink>
+        </header>
+
+        <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div v-for="n in 3" :key="`quiz-skeleton-${n}`" class="h-48 animate-pulse rounded-3xl bg-slate-100"></div>
+        </div>
+        <div v-else-if="featuredQuizzes.length === 0" class="rounded-3xl border border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">
+          Publish your first quiz to see it featured here.
+        </div>
+        <div v-else class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <article
+            v-for="quiz in featuredQuizzes"
+            :key="quiz.id"
+            class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-brand-900/5 transition hover:-translate-y-1 hover:shadow-xl"
+          >
+            <h3 class="text-xl font-semibold text-slate-900">{{ quiz.title }}</h3>
+            <p class="text-sm text-slate-500">{{ quiz.description || 'Challenge yourself with a timed mock test.' }}</p>
+            <div class="mt-auto flex items-center justify-between text-sm text-slate-500">
+              <span>{{ quiz.question_count }} questions</span>
+              <RouterLink :to="{ name: 'quiz', params: { id: quiz.id } }" class="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                Start
+                <span aria-hidden="true">→</span>
+              </RouterLink>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-4xl border border-slate-200 bg-white/90 p-10 text-center shadow-xl shadow-brand-900/5 md:p-14">
+      <div class="mx-auto max-w-4xl space-y-4">
+        <h2 class="text-3xl font-semibold text-slate-900 md:text-4xl">Ready to accelerate your preparation?</h2>
+        <p class="text-sm text-slate-500">
+          Join thousands of aspirants who rely on QuizMaster for structured practice, real-time analytics, and exam-ready confidence.
+        </p>
+        <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <RouterLink
+            :to="primaryCta.to"
+            class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-brand-500"
+          >
+            {{ primaryCta.label }}
+          </RouterLink>
+          <RouterLink
+            :to="secondaryCta.to"
+            class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+          >
+            {{ secondaryCta.label }}
+          </RouterLink>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

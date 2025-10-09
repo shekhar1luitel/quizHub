@@ -94,6 +94,29 @@ def test_practice_category_detail_returns_questions():
     assert any(option.is_correct for option in detail.questions[0].options)
 
 
+def test_practice_category_without_questions_returns_empty_list():
+    with TestingSessionLocal() as session:
+        session.query(Option).delete()
+        session.query(Question).delete()
+        session.query(Category).delete()
+
+        category = Category(
+            name="Current Affairs",
+            slug="current-affairs",
+            description="Daily news and government updates",
+            icon="📰",
+        )
+        session.add(category)
+        session.commit()
+
+        detail = practice_routes.get_practice_category(slug="current-affairs", db=session)
+
+    assert detail.total_questions == 0
+    assert detail.questions == []
+    assert detail.difficulty == "Mixed"
+    assert detail.slug == "current-affairs"
+
+
 def test_unknown_category_returns_not_found():
     with TestingSessionLocal() as session:
         seed_questions(session)

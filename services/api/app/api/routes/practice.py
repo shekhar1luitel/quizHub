@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Set
-
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db_session
+from app.core.difficulty import difficulty_label, normalized_difficulty
 from app.models.category import Category
 from app.models.question import Question
 from app.schemas.practice import (
@@ -19,31 +18,6 @@ from app.schemas.practice import (
 )
 
 router = APIRouter(prefix="/practice", tags=["practice"])
-
-
-def _normalized_difficulty(value: Optional[str]) -> Optional[str]:
-    if value is None:
-        return None
-    trimmed = value.strip()
-    if not trimmed:
-        return None
-    lowered = trimmed.lower()
-    mapping = {
-        "easy": "Easy",
-        "medium": "Medium",
-        "hard": "Hard",
-    }
-    return mapping.get(lowered, trimmed)
-
-
-def _difficulty_label(difficulties: Sequence[str]) -> str:
-    unique = {_normalized_difficulty(difficulty) for difficulty in difficulties if difficulty}
-    unique.discard(None)
-    if not unique:
-        return "Mixed"
-    if len(unique) == 1:
-        return next(iter(unique)) or "Mixed"
-    return "Mixed"
 
 
 @router.get("/categories", response_model=List[PracticeCategorySummary])
@@ -68,7 +42,7 @@ def list_practice_categories(
         if category_id is None:
             continue
         totals[category_id] = totals.get(category_id, 0) + 1
-        normalized = _normalized_difficulty(difficulty)
+        normalized = normalized_difficulty(difficulty)
         if normalized:
             difficulties_map.setdefault(category_id, set()).add(normalized)
 
@@ -82,7 +56,7 @@ def list_practice_categories(
                 description=category.description,
                 icon=category.icon,
                 total_questions=totals.get(category.id, 0),
-                difficulty=_difficulty_label(difficulties),
+                difficulty=difficulty_label(difficulties),
                 difficulties=difficulties,
             )
         )
@@ -110,8 +84,6 @@ def get_practice_category(
     )
 
     questions = list(db.scalars(stmt))
-    if not questions:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
     questions_payload = [
         PracticeQuestion(
@@ -134,7 +106,7 @@ def get_practice_category(
     difficulties = [
         normalized
         for question in questions
-        for normalized in [_normalized_difficulty(question.difficulty)]
+        for normalized in [normalized_difficulty(question.difficulty)]
         if normalized
     ]
     return PracticeCategoryDetail(
@@ -143,7 +115,6 @@ def get_practice_category(
         description=category.description,
         icon=category.icon,
         total_questions=len(questions),
-        difficulty=_difficulty_label(difficulties),
+        difficulty=difficulty_label(difficulties),
         questions=questions_payload,
     )
-

@@ -45,6 +45,12 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
+    path: '/admin/quizzes',
+    name: 'admin-quizzes',
+    component: () => import('../pages/admin/QuizzesCRUD.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
     path: '/admin/categories',
     name: 'admin-categories',
     component: () => import('../pages/admin/CategoriesCRUD.vue'),

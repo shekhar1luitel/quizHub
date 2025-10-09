@@ -88,6 +88,12 @@ const quizHealth = computed(() => {
           >
             Add question
           </RouterLink>
+          <RouterLink
+            :to="{ name: 'admin-quizzes' }"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+          >
+            Build quiz
+          </RouterLink>
         </div>
       </div>
     </header>
@@ -148,7 +154,10 @@ const quizHealth = computed(() => {
           </div>
         </header>
         <div class="mt-5 space-y-3 text-sm">
-          <p v-if="overview.recent_quizzes.length === 0" class="text-slate-500">No quizzes yet. Add questions to get started.</p>
+          <p v-if="overview.recent_quizzes.length === 0" class="text-slate-500">
+            No quizzes yet.
+            <RouterLink :to="{ name: 'admin-quizzes' }" class="text-brand-600 hover:underline">Build your first quiz.</RouterLink>
+          </p>
           <ul v-else class="space-y-2">
             <li
               v-for="quiz in overview.recent_quizzes"

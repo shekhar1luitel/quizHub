@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.difficulty import difficulty_label, normalized_difficulty
 from app.api.deps import get_current_user, get_db_session
 from app.models.attempt import Attempt, AttemptAnswer
+from app.models.category import Category
 from app.models.question import Question, QuizQuestion
 from app.models.quiz import Quiz
 from app.models.user import User
@@ -15,6 +19,7 @@ from app.schemas.attempt import (
     AttemptAnswerOption,
     AttemptAnswerReview,
     AttemptCreate,
+    AttemptHistoryEntry,
     AttemptResult,
 )
 
@@ -142,6 +147,101 @@ def submit_attempt(
         score=float(attempt.score),
         answers=answers,
     )
+
+
+@router.get("/history", response_model=List[AttemptHistoryEntry])
+def list_attempt_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> List[AttemptHistoryEntry]:
+    attempts: List[Attempt] = (
+        db.query(Attempt)
+        .options(selectinload(Attempt.quiz))
+        .filter(Attempt.user_id == current_user.id)
+        .order_by(Attempt.submitted_at.desc())
+        .all()
+    )
+
+    if not attempts:
+        return []
+
+    attempt_ids = [attempt.id for attempt in attempts]
+
+    answer_rows = db.execute(
+        select(
+            AttemptAnswer.attempt_id,
+            Question.category_id,
+            Question.difficulty,
+        )
+        .join(Question, Question.id == AttemptAnswer.question_id)
+        .where(AttemptAnswer.attempt_id.in_(attempt_ids))
+    ).all()
+
+    category_counts: Dict[int, Dict[Optional[int], int]] = defaultdict(lambda: defaultdict(int))
+    category_names: Dict[Tuple[int, Optional[int]], str] = {}
+    difficulty_map: Dict[int, List[str]] = defaultdict(list)
+
+    # Fetch category names in a separate query to reduce duplicates.
+    if answer_rows:
+        category_ids = {row.category_id for row in answer_rows if row.category_id is not None}
+        if category_ids:
+            category_lookup = dict(
+                db.execute(
+                    select(Category.id, Category.name).where(Category.id.in_(category_ids))
+                ).all()
+            )
+        else:
+            category_lookup = {}
+
+        for row in answer_rows:
+            attempt_id = row.attempt_id
+            category_id = row.category_id
+            category_counts[attempt_id][category_id] += 1
+
+            if category_id is not None:
+                category_name = category_lookup.get(category_id, "General Practice")
+            else:
+                category_name = "General Practice"
+            category_names[(attempt_id, category_id)] = category_name
+
+            normalized = normalized_difficulty(row.difficulty)
+            if normalized:
+                difficulty_map[attempt_id].append(normalized)
+
+    history: List[AttemptHistoryEntry] = []
+    for attempt in attempts:
+        top_category_id: Optional[int] = None
+        top_category_name: Optional[str] = None
+
+        counts = category_counts.get(attempt.id)
+        if counts:
+            sorted_categories = sorted(
+                counts.items(),
+                key=lambda item: (-item[1], category_names.get((attempt.id, item[0]), "")),
+            )
+            top_category_id = sorted_categories[0][0]
+            top_category_name = category_names.get((attempt.id, top_category_id), "General Practice")
+
+        difficulties = difficulty_map.get(attempt.id, [])
+        difficulty = difficulty_label(difficulties) if difficulties else "Mixed"
+
+        history.append(
+            AttemptHistoryEntry(
+                id=attempt.id,
+                quiz_id=attempt.quiz_id,
+                quiz_title=attempt.quiz.title if attempt.quiz else "Untitled quiz",
+                submitted_at=attempt.submitted_at,
+                total_questions=attempt.total_questions,
+                correct_answers=attempt.correct_answers,
+                score=float(attempt.score),
+                duration_seconds=attempt.duration_seconds or 0,
+                category_id=top_category_id,
+                category_name=top_category_name,
+                difficulty=difficulty,
+            )
+        )
+
+    return history
 
 
 @router.get("/{attempt_id}", response_model=AttemptResult)

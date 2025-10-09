@@ -14,9 +14,9 @@ def get_db_session(db: Session = Depends(get_db)) -> Session:
     return db
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
-    db: Session = Depends(get_db_session),
+def _resolve_user(
+    credentials: HTTPAuthorizationCredentials | None,
+    db: Session,
 ) -> User:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -30,6 +30,22 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    db: Session = Depends(get_db_session),
+) -> User:
+    return _resolve_user(credentials, db)
+
+
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    db: Session = Depends(get_db_session),
+) -> User | None:
+    if credentials is None:
+        return None
+    return _resolve_user(credentials, db)
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:

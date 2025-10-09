@@ -1,21 +1,40 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
-type AttemptType = 'quiz' | 'practice' | 'mock'
+import { http } from '../api/http'
 
-type HistoryEntry = {
+type AttemptType = 'quiz' | 'practice' | 'mock'
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Mixed'
+
+interface AttemptHistoryEntryResponse {
   id: number
+  quiz_id: number
+  quiz_title: string
+  submitted_at: string
+  total_questions: number
+  correct_answers: number
+  score: number
+  duration_seconds: number
+  category_id: number | null
+  category_name: string | null
+  difficulty: string | null
+  type: string
+}
+
+interface HistoryEntry {
+  id: number
+  quizId: number | null
   title: string
   category: string
-  categoryId: number
+  categoryId: number | null
   score: number
   totalQuestions: number
   correctAnswers: number
   timeSpent: number
   date: string
   type: AttemptType
-  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Mixed'
+  difficulty: Difficulty
 }
 
 const searchTerm = ref('')
@@ -23,86 +42,55 @@ const selectedCategory = ref('All')
 const selectedType = ref<'All' | AttemptType>('All')
 const sortBy = ref<'date' | 'score' | 'title'>('date')
 
-const history = ref<HistoryEntry[]>([
-  {
-    id: 1,
-    title: 'General Knowledge Quiz',
-    category: 'General Knowledge',
-    categoryId: 1,
-    score: 85,
-    totalQuestions: 20,
-    correctAnswers: 17,
-    timeSpent: 1800,
-    date: '2024-01-15T10:30:00Z',
-    type: 'quiz',
-    difficulty: 'Mixed',
-  },
-  {
-    id: 2,
-    title: 'Aptitude Practice Test',
-    category: 'Aptitude',
-    categoryId: 2,
-    score: 72,
-    totalQuestions: 15,
-    correctAnswers: 11,
-    timeSpent: 1200,
-    date: '2024-01-14T14:20:00Z',
-    type: 'practice',
-    difficulty: 'Medium',
-  },
-  {
-    id: 3,
-    title: 'Reasoning Mock Test',
-    category: 'Reasoning',
-    categoryId: 3,
-    score: 90,
-    totalQuestions: 25,
-    correctAnswers: 23,
-    timeSpent: 2100,
-    date: '2024-01-13T09:15:00Z',
-    type: 'mock',
-    difficulty: 'Hard',
-  },
-  {
-    id: 4,
-    title: 'English Grammar Quiz',
-    category: 'English',
-    categoryId: 4,
-    score: 68,
-    totalQuestions: 18,
-    correctAnswers: 12,
-    timeSpent: 1500,
-    date: '2024-01-12T16:45:00Z',
-    type: 'quiz',
-    difficulty: 'Easy',
-  },
-  {
-    id: 5,
-    title: 'Current Affairs Test',
-    category: 'Current Affairs',
-    categoryId: 5,
-    score: 78,
-    totalQuestions: 22,
-    correctAnswers: 17,
-    timeSpent: 1650,
-    date: '2024-01-11T11:30:00Z',
-    type: 'quiz',
-    difficulty: 'Mixed',
-  },
-  {
-    id: 6,
-    title: 'Mathematics Practice',
-    category: 'Mathematics',
-    categoryId: 6,
-    score: 82,
-    totalQuestions: 20,
-    correctAnswers: 16,
-    timeSpent: 2400,
-    date: '2024-01-10T13:20:00Z',
-    type: 'practice',
-    difficulty: 'Hard',
-  },
-])
+const loading = ref(true)
+const error = ref('')
+const history = ref<HistoryEntry[]>([])
+
+const DEFAULT_CATEGORY = 'General Practice'
+
+const mapType = (value: string | undefined): AttemptType => {
+  if (value === 'practice' || value === 'mock') return value
+  return 'quiz'
+}
+
+const normalizeDifficulty = (value: string | null | undefined): Difficulty => {
+  if (!value) return 'Mixed'
+  const normalized = value.toLowerCase()
+  if (normalized.startsWith('easy')) return 'Easy'
+  if (normalized.startsWith('medium')) return 'Medium'
+  if (normalized.startsWith('hard')) return 'Hard'
+  return 'Mixed'
+}
+
+const loadHistory = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await http.get<AttemptHistoryEntryResponse[]>('/attempts/history')
+    history.value = data.map((entry) => ({
+      id: entry.id,
+      quizId: entry.quiz_id ?? null,
+      title: entry.quiz_title,
+      category: entry.category_name?.trim() || DEFAULT_CATEGORY,
+      categoryId: entry.category_id ?? null,
+      score: Number(entry.score ?? 0),
+      totalQuestions: entry.total_questions,
+      correctAnswers: entry.correct_answers,
+      timeSpent: entry.duration_seconds ?? 0,
+      date: entry.submitted_at,
+      type: mapType(entry.type),
+      difficulty: normalizeDifficulty(entry.difficulty),
+    }))
+  } catch (err) {
+    console.error(err)
+    error.value = 'Unable to load history.'
+    history.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadHistory)
 
 const categories = computed(() => ['All', ...new Set(history.value.map((item) => item.category))])
 
@@ -207,7 +195,19 @@ const typeBadge = (type: AttemptType) => {
       </RouterLink>
     </header>
 
-    <div class="grid gap-6 md:grid-cols-4">
+    <div v-if="loading" class="grid gap-6 md:grid-cols-4">
+      <div v-for="n in 4" :key="`history-skeleton-${n}`" class="h-32 animate-pulse rounded-3xl bg-white/70"></div>
+    </div>
+    <p v-else-if="error" class="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-700">
+      {{ error }}
+    </p>
+    <div
+      v-else-if="history.length === 0"
+      class="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500"
+    >
+      Complete your first quiz to start building a history of attempts. Your session insights will appear here.
+    </div>
+    <div v-else class="grid gap-6 md:grid-cols-4">
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Total sessions</p>
         <p class="mt-3 text-3xl font-semibold text-slate-900">{{ totalTests }}</p>
@@ -230,7 +230,7 @@ const typeBadge = (type: AttemptType) => {
       </article>
     </div>
 
-    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section v-if="!error" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 class="text-lg font-semibold text-slate-900">Sessions</h2>
@@ -269,7 +269,10 @@ const typeBadge = (type: AttemptType) => {
         </div>
       </header>
 
-      <div v-if="filteredHistory.length === 0" class="mt-6 rounded-2xl bg-slate-50 p-6 text-sm text-slate-500">
+      <div v-if="loading" class="mt-6 space-y-3">
+        <div v-for="n in 3" :key="`history-row-${n}`" class="h-20 animate-pulse rounded-3xl bg-slate-100/60"></div>
+      </div>
+      <div v-else-if="filteredHistory.length === 0" class="mt-6 rounded-2xl bg-slate-50 p-6 text-sm text-slate-500">
         No sessions yet with these filters. Try removing a filter or practise a quiz.
       </div>
 
@@ -305,11 +308,20 @@ const typeBadge = (type: AttemptType) => {
                   View breakdown
                 </RouterLink>
                 <RouterLink
-                  :to="{ name: 'quiz', params: { id: entry.categoryId } }"
+                  v-if="entry.quizId"
+                  :to="{ name: 'quiz', params: { id: entry.quizId } }"
                   class="rounded-full bg-slate-900 px-3 py-1 text-white transition hover:bg-slate-700"
                 >
                   Retake
                 </RouterLink>
+                <button
+                  v-else
+                  class="rounded-full border border-slate-200 px-3 py-1 text-slate-400"
+                  type="button"
+                  disabled
+                >
+                  Retake
+                </button>
               </div>
             </div>
           </div>

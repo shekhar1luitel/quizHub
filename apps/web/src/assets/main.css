@@ -1,4 +1,31 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+    background-color: #f8fafc;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(76, 110, 245, 0.12), transparent 55%),
+      radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.12), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background-color: rgba(76, 110, 245, 0.25);
+    color: #273a8b;
+  }
+}
