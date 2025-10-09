@@ -477,8 +477,8 @@ watch(
       <div class="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl shadow-brand-900/5">
         <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Latest quizzes</p>
-            <h2 class="text-lg font-semibold text-slate-900">Launch-ready sets</h2>
+            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Quiz activity</p>
+            <h2 class="text-lg font-semibold text-slate-900">Recent quizzes</h2>
             <p class="text-xs text-slate-500">
               <span v-if="quizzes.length === 0">No quizzes created yet.</span>
               <span v-else>Showing {{ recentQuizzes.length }} of {{ quizzes.length }} quizzes</span>

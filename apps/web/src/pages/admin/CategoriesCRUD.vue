@@ -270,7 +270,7 @@ watch(
         <div class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg backdrop-blur">
           <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-slate-900">Latest categories</h2>
+              <h2 class="text-lg font-semibold text-slate-900">Recent categories</h2>
               <p class="text-xs text-slate-500">
                 <span v-if="totalCategories === 0">No categories created yet.</span>
                 <span v-else>Showing {{ recentCategories.length }} of {{ totalCategories }} categories</span>

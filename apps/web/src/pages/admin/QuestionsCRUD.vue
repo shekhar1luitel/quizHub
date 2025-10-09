@@ -531,7 +531,7 @@ watch(
       <div class="rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-brand-900/5 backdrop-blur md:p-7">
         <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900">Latest questions</h2>
+            <h2 class="text-lg font-semibold text-slate-900">Recent questions</h2>
             <p class="text-xs text-slate-500">
               <span v-if="totalQuestions === 0">No questions saved yet.</span>
               <span v-else>Showing {{ recentQuestions.length }} of {{ totalQuestions }} questions • Avg options {{ averageOptions.toFixed(1) }}</span>

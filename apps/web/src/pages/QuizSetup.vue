@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { http } from '../api/http'
@@ -37,6 +37,7 @@ const loading = reactive({
   submitting: false,
 })
 const error = ref<string | null>(null)
+const STORAGE_KEY = 'quizHub::quiz-setup-preferences'
 
 const filters = reactive({
   categorySlug: '' as string,
@@ -47,6 +48,33 @@ const filters = reactive({
 
 const timeOptions: TimeLimitOption[] = [10, 15, 20]
 const difficultyOptions = ['Easy', 'Medium', 'Hard', 'Mixed']
+const hasSavedSetup = ref(false)
+
+const selectedQuiz = computed(() => quizzes.value.find((quiz) => quiz.id === filters.quizId) ?? null)
+const selectedCategory = computed(() => categories.value.find((cat) => cat.slug === filters.categorySlug) ?? null)
+const recommendedQuiz = computed(() => {
+  if (!quizzes.value.length) return null
+  return quizzes.value.find((quiz) => quiz.is_active) ?? quizzes.value[0]
+})
+const quickStartBusy = computed(() => loading.quizzes || loading.submitting)
+const savedSetupMeta = computed(() => {
+  const parts: string[] = []
+  if (selectedCategory.value) parts.push(selectedCategory.value.name)
+  if (filters.difficulty) parts.push(filters.difficulty)
+  parts.push(`${filters.timeLimit} min`)
+  return parts.join(' · ')
+})
+const recommendedMeta = computed(() => {
+  const quiz = recommendedQuiz.value
+  if (!quiz) return ''
+  const parts = [`${quiz.question_count} questions`]
+  if (quiz.is_active) {
+    parts.push('Live quiz')
+  } else {
+    parts.push('Draft quiz')
+  }
+  return parts.join(' · ')
+})
 
 const filteredQuizzes = computed(() => {
   const selectedSlug = filters.categorySlug
@@ -65,12 +93,58 @@ const filteredQuizzes = computed(() => {
 
 const canStart = computed(() => Boolean(filters.quizId))
 
+const restoreFilters = () => {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw) as Partial<typeof filters>
+    if (typeof saved.categorySlug === 'string') {
+      filters.categorySlug = saved.categorySlug
+    }
+    if (typeof saved.difficulty === 'string') {
+      filters.difficulty = saved.difficulty
+    }
+    if (typeof saved.quizId === 'number') {
+      filters.quizId = saved.quizId
+    }
+    if (typeof saved.timeLimit === 'number' && (timeOptions as number[]).includes(saved.timeLimit)) {
+      filters.timeLimit = saved.timeLimit as TimeLimitOption
+    }
+    hasSavedSetup.value = Boolean(
+      saved.quizId ||
+        saved.categorySlug ||
+        saved.difficulty ||
+        (typeof saved.timeLimit === 'number' && (timeOptions as number[]).includes(saved.timeLimit))
+    )
+  } catch (restoreError) {
+    console.warn('Unable to restore quiz setup preferences', restoreError)
+  }
+}
+
+const persistFilters = () => {
+  if (typeof window === 'undefined') return
+  try {
+    const payload = {
+      categorySlug: filters.categorySlug,
+      difficulty: filters.difficulty,
+      quizId: filters.quizId,
+      timeLimit: filters.timeLimit,
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    hasSavedSetup.value = Boolean(payload.quizId || payload.categorySlug || payload.difficulty || payload.timeLimit)
+  } catch (persistError) {
+    console.warn('Unable to persist quiz setup preferences', persistError)
+  }
+}
+
 const loadQuizzes = async () => {
   loading.quizzes = true
   try {
     const { data } = await http.get<QuizSummary[]>('/quizzes')
     quizzes.value = data
-    if (!filters.quizId && data.length > 0) {
+    const current = filters.quizId ? data.find((quiz) => quiz.id === filters.quizId && quiz.is_active) ?? null : null
+    if (!current && data.length > 0) {
       const active = data.find((quiz) => quiz.is_active)
       filters.quizId = active?.id ?? data[0]?.id ?? null
     }
@@ -108,10 +182,34 @@ const goToCategories = (slug: string) => {
   router.push({ name: 'practice', params: { slug } })
 }
 
+const resumeSavedSetup = () => {
+  if (!canStart.value || quickStartBusy.value) return
+  startQuiz()
+}
+
+const startRecommendedQuiz = () => {
+  if (quickStartBusy.value) return
+  const nextQuiz = recommendedQuiz.value
+  if (!nextQuiz) return
+  filters.quizId = nextQuiz.id
+  if (!(timeOptions as number[]).includes(filters.timeLimit)) {
+    filters.timeLimit = 15
+  }
+  startQuiz()
+}
+
 onMounted(() => {
+  restoreFilters()
   loadQuizzes()
   loadCategories()
 })
+
+watch(
+  () => [filters.categorySlug, filters.difficulty, filters.quizId, filters.timeLimit],
+  () => {
+    persistFilters()
+  }
+)
 </script>
 
 <template>
@@ -131,6 +229,54 @@ onMounted(() => {
         </div>
       </div>
     </header>
+
+    <div v-if="hasSavedSetup || recommendedQuiz" class="grid gap-4 md:grid-cols-2">
+      <button
+        v-if="hasSavedSetup && canStart"
+        class="group flex h-full flex-col gap-3 rounded-3xl border border-slate-900 bg-slate-900 p-5 text-left text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        type="button"
+        :disabled="quickStartBusy || !canStart"
+        @click="resumeSavedSetup"
+      >
+        <span class="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/70">
+          Resume in one click
+        </span>
+        <div class="space-y-1">
+          <p class="text-lg font-semibold leading-tight">{{ selectedQuiz?.title || 'Saved mock test' }}</p>
+          <p class="text-sm text-white/80">
+            {{ savedSetupMeta }}
+          </p>
+        </div>
+        <span class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/80">
+          Start now
+          <span aria-hidden="true">→</span>
+        </span>
+      </button>
+
+      <button
+        v-if="recommendedQuiz"
+        class="group flex h-full flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+        type="button"
+        :disabled="quickStartBusy"
+        @click="startRecommendedQuiz"
+      >
+        <span class="text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-400">
+          Quick mock test
+        </span>
+        <div class="space-y-1">
+          <p class="text-lg font-semibold leading-tight">
+            {{ recommendedQuiz.title }}
+          </p>
+          <p class="text-sm text-slate-500">
+            {{ recommendedMeta }}
+          </p>
+        </div>
+        <span class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-brand-600 group-hover:text-brand-500">
+          Launch quiz
+          <span aria-hidden="true">→</span>
+        </span>
+      </button>
+    </div>
 
     <div class="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
       <section class="space-y-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl shadow-brand-900/10">

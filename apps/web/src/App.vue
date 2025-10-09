@@ -9,9 +9,10 @@ import { http } from './api/http'
 
 interface SidebarLink {
   label: string
-  to: RouteLocationRaw
+  to?: RouteLocationRaw
   icon: string
   badge?: string
+  children?: SidebarLink[]
 }
 
 interface SidebarSection {
@@ -34,6 +35,7 @@ const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
 const notificationCount = ref(0)
 const notificationOverflow = ref(false)
+const expandedGroups = ref<Record<string, boolean>>({})
 
 const membershipBadgeLabel = (membership: OrgMembershipSummary) => {
   const type = membership.organization.type?.toLowerCase().trim() ?? ''
@@ -190,60 +192,77 @@ const adminMenuLinks = computed<SidebarLink[]>(() => {
 
   return [
     {
-      label: 'Overview',
+      label: 'Admin overview',
       to: { name: 'admin' },
-      badge: 'Live stats',
       icon: `
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75h3v7.5h-3zM10.5 8.25h3v12h-3zM16.5 4.5h3v15.75h-3z" />
       `,
     },
     {
-      label: 'Question studio',
-      to: { name: 'admin-questions' },
-      badge: 'Compose & edit',
+      label: 'Quizzes',
       icon: `
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12M6 12h12" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6h15M4.5 12h15M4.5 18h15" />
       `,
+      children: [
+        {
+          label: 'Manage quizzes',
+          to: { name: 'admin-quizzes' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25h13.5v5.25H5.25zM5.25 12.75h13.5v6H5.25zM12 12.75v6" />
+          `,
+        },
+        {
+          label: 'Quiz library',
+          to: { name: 'admin-quiz-library' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h13.5v10.5H5.25zM5.25 11.25h13.5" />
+          `,
+        },
+      ],
     },
     {
-      label: 'Question library',
-      to: { name: 'admin-question-library' },
-      badge: 'Full bank',
+      label: 'Questions',
       icon: `
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h15M4.5 12h15M4.5 18.75h15" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 5.25h12a1.5 1.5 0 0 1 1.5 1.5v10.5A1.5 1.5 0 0 1 18 18.75H6a1.5 1.5 0 0 1-1.5-1.5V6.75A1.5 1.5 0 0 1 6 5.25Z" />
       `,
+      children: [
+        {
+          label: 'Manage questions',
+          to: { name: 'admin-questions' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12M6 12h12" />
+          `,
+        },
+        {
+          label: 'Question bank',
+          to: { name: 'admin-question-library' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h15M4.5 12h15M4.5 18.75h15" />
+          `,
+        },
+      ],
     },
     {
-      label: 'Quiz studio',
-      to: { name: 'admin-quizzes' },
-      badge: 'Assemble tests',
-      icon: `
-        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25h13.5v5.25H5.25zM5.25 12.75h13.5v6H5.25zM12 12.75v6" />
-      `,
-    },
-    {
-      label: 'Quiz library',
-      to: { name: 'admin-quiz-library' },
-      badge: 'Published sets',
-      icon: `
-        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h13.5v10.5H5.25zM5.25 11.25h13.5" />
-      `,
-    },
-    {
-      label: 'Category studio',
-      to: { name: 'admin-categories' },
-      badge: 'Create topics',
-      icon: `
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5zM12.75 6.75H19.5v6.75h-6.75zM4.5 15.75h6.75v6.75H4.5zM12.75 15.75H19.5v6.75h-6.75z" />
-      `,
-    },
-    {
-      label: 'Category library',
-      to: { name: 'admin-category-library' },
-      badge: 'Browse taxonomy',
+      label: 'Categories',
       icon: `
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6v6h-6zM13.5 5.25h6v6h-6zM13.5 14.25h6v6h-6zM4.5 14.25h6v6h-6z" />
       `,
+      children: [
+        {
+          label: 'Manage categories',
+          to: { name: 'admin-categories' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5zM12.75 6.75H19.5v6.75h-6.75zM4.5 15.75h6.75v6.75H4.5zM12.75 15.75H19.5v6.75h-6.75z" />
+          `,
+        },
+        {
+          label: 'Category list',
+          to: { name: 'admin-category-library' },
+          icon: `
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6v6h-6zM13.5 5.25h6v6h-6zM13.5 14.25h6v6h-6zM4.5 14.25h6v6h-6z" />
+          `,
+        },
+      ],
     },
   ]
 })
@@ -297,7 +316,7 @@ const navSections = computed<SidebarSection[]>(() => {
   }
 
   if (adminMenuLinks.value.length > 0) {
-    sections.push({ title: 'Admin', items: adminMenuLinks.value })
+    sections.push({ title: 'Admin tools', items: adminMenuLinks.value })
   }
 
   if (platformLinks.value.length > 0) {
@@ -307,12 +326,29 @@ const navSections = computed<SidebarSection[]>(() => {
   return sections
 })
 
-const isLinkActive = (item: SidebarLink) => {
+const isLinkActive = (item: SidebarLink): boolean => {
+  if (item.children?.length) {
+    return item.children.some((child) => isLinkActive(child))
+  }
+  if (!item.to) return false
   const resolved = router.resolve(item.to)
   if (resolved.name && route.name) {
     return resolved.name === route.name
   }
   return resolved.href === route.href
+}
+
+const isGroupExpanded = (item: SidebarLink) => {
+  const state = expandedGroups.value[item.label]
+  if (typeof state === 'boolean') return state
+  return isLinkActive(item)
+}
+
+const toggleGroup = (item: SidebarLink) => {
+  expandedGroups.value = {
+    ...expandedGroups.value,
+    [item.label]: !isGroupExpanded(item),
+  }
 }
 
 const toggleSidebar = () => {
@@ -375,6 +411,18 @@ watch(
   () => {
     sidebarOpen.value = false
     userMenuOpen.value = false
+    const nextOpen: Record<string, boolean> = {}
+    adminMenuLinks.value.forEach((item) => {
+      if (item.children?.length && isLinkActive(item)) {
+        nextOpen[item.label] = true
+      }
+    })
+    if (Object.keys(nextOpen).length > 0) {
+      expandedGroups.value = {
+        ...expandedGroups.value,
+        ...nextOpen,
+      }
+    }
   }
 )
 
@@ -546,46 +594,139 @@ watch(
               {{ section.title }}
             </p>
             <div class="space-y-1.5">
-              <RouterLink
+              <div
                 v-for="item in section.items"
                 :key="item.label"
-                :to="item.to"
-                class="group flex items-center gap-3 rounded-2xl px-3 py-2 transition"
-                :class="isLinkActive(item)
-                  ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                  : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'"
-                @click="closeSidebar"
+                class="space-y-1.5"
               >
-                <span
-                  class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 text-slate-500 transition group-hover:border-brand-100 group-hover:bg-brand-50 group-hover:text-brand-600"
-                  :class="isLinkActive(item) ? 'border-white/20 bg-white/10 text-white' : ''"
+                <button
+                  v-if="item.children?.length"
+                  class="group flex w-full items-center gap-3 rounded-2xl px-3 py-2 transition"
+                  type="button"
+                  :class="isLinkActive(item)
+                    ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
+                    : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'"
+                  @click="toggleGroup(item)"
                 >
-                  <svg
-                    class="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    v-html="item.icon"
-                  ></svg>
-                </span>
-                <div class="flex flex-1 flex-col">
-                  <span class="font-semibold leading-tight">
-                    {{ item.label }}
-                  </span>
                   <span
-                    v-if="item.badge"
-                    class="text-[11px] font-medium uppercase tracking-[0.3em]"
-                    :class="isLinkActive(item) ? 'text-white/70' : 'text-slate-400 group-hover:text-slate-500'"
+                    class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 text-slate-500 transition group-hover:border-brand-100 group-hover:bg-brand-50 group-hover:text-brand-600"
+                    :class="isLinkActive(item) ? 'border-white/20 bg-white/10 text-white' : ''"
                   >
-                    {{ item.badge }}
+                    <svg
+                      class="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      v-html="item.icon"
+                    ></svg>
                   </span>
+                  <div class="flex flex-1 flex-col text-left">
+                    <span class="font-semibold leading-tight">
+                      {{ item.label }}
+                    </span>
+                    <span
+                      v-if="item.badge"
+                      class="text-[11px] font-medium uppercase tracking-[0.3em]"
+                      :class="isLinkActive(item) ? 'text-white/70' : 'text-slate-400 group-hover:text-slate-500'"
+                    >
+                      {{ item.badge }}
+                    </span>
+                  </div>
+                  <span
+                    class="flex h-6 w-6 items-center justify-center text-xs transition"
+                    :class="isGroupExpanded(item) ? (isLinkActive(item) ? 'text-white rotate-180' : 'text-slate-700 rotate-180') : isLinkActive(item) ? 'text-white' : 'text-slate-500'"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 8l4 4 4-4" />
+                    </svg>
+                  </span>
+                </button>
+                <RouterLink
+                  v-else
+                  :to="item.to!"
+                  class="group flex items-center gap-3 rounded-2xl px-3 py-2 transition"
+                  :class="isLinkActive(item)
+                    ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
+                    : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'"
+                  @click="closeSidebar"
+                >
+                  <span
+                    class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 text-slate-500 transition group-hover:border-brand-100 group-hover:bg-brand-50 group-hover:text-brand-600"
+                    :class="isLinkActive(item) ? 'border-white/20 bg-white/10 text-white' : ''"
+                  >
+                    <svg
+                      class="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      v-html="item.icon"
+                    ></svg>
+                  </span>
+                  <div class="flex flex-1 flex-col">
+                    <span class="font-semibold leading-tight">
+                      {{ item.label }}
+                    </span>
+                    <span
+                      v-if="item.badge"
+                      class="text-[11px] font-medium uppercase tracking-[0.3em]"
+                      :class="isLinkActive(item) ? 'text-white/70' : 'text-slate-400 group-hover:text-slate-500'"
+                    >
+                      {{ item.badge }}
+                    </span>
+                  </div>
+                  <span
+                    class="h-2 w-2 rounded-full transition"
+                    :class="isLinkActive(item) ? 'bg-brand-400' : 'bg-transparent group-hover:bg-brand-200'"
+                  ></span>
+                </RouterLink>
+                <div
+                  v-if="item.children?.length && isGroupExpanded(item)"
+                  class="space-y-1.5 pl-12"
+                >
+                  <RouterLink
+                    v-for="child in item.children"
+                    :key="child.label"
+                    :to="child.to!"
+                    class="group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition"
+                    :class="isLinkActive(child)
+                      ? 'bg-slate-900 text-white shadow-md shadow-slate-900/15'
+                      : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'"
+                    @click="closeSidebar"
+                  >
+                    <span
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 text-slate-500 transition group-hover:border-brand-100 group-hover:bg-brand-50 group-hover:text-brand-600"
+                      :class="isLinkActive(child) ? 'border-white/20 bg-white/10 text-white' : ''"
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        v-html="child.icon"
+                      ></svg>
+                    </span>
+                    <div class="flex flex-1 flex-col text-left">
+                      <span class="font-semibold leading-tight">
+                        {{ child.label }}
+                      </span>
+                      <span
+                        v-if="child.badge"
+                        class="text-[11px] font-medium uppercase tracking-[0.3em]"
+                        :class="isLinkActive(child) ? 'text-white/70' : 'text-slate-400 group-hover:text-slate-500'"
+                      >
+                        {{ child.badge }}
+                      </span>
+                    </div>
+                    <span
+                      class="h-2 w-2 rounded-full transition"
+                      :class="isLinkActive(child) ? 'bg-brand-400' : 'bg-transparent group-hover:bg-brand-200'"
+                    ></span>
+                  </RouterLink>
                 </div>
-                <span
-                  class="h-2 w-2 rounded-full transition"
-                  :class="isLinkActive(item) ? 'bg-brand-400' : 'bg-transparent group-hover:bg-brand-200'"
-                ></span>
-              </RouterLink>
+              </div>
             </div>
           </div>
         </nav>

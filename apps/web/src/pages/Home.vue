@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import type { AxiosError } from 'axios'
 
 import { http } from '../api/http'
@@ -58,6 +58,14 @@ interface DashboardSummary {
 }
 
 const auth = useAuthStore()
+
+interface QuickAction {
+  label: string
+  description: string
+  to: RouteLocationRaw
+  icon: string
+  highlight?: boolean
+}
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -261,6 +269,108 @@ const loadHomeData = async () => {
 }
 
 onMounted(loadHomeData)
+
+const quickActions = computed<QuickAction[]>(() => {
+  if (auth.isAdmin) {
+    return [
+      {
+        label: 'Add questions',
+        description: 'Jump straight into the Question Studio and draft new items.',
+        to: { name: 'admin-questions' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5H4.5" />
+        `,
+        highlight: true,
+      },
+      {
+        label: 'Build a quiz',
+        description: 'Assemble and publish mock tests without leaving the flow.',
+        to: { name: 'admin-quizzes' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h13.5v10.5H5.25zM5.25 11.25h13.5" />
+        `,
+      },
+      {
+        label: 'Organise categories',
+        description: 'Tidy your taxonomy so practice sets stay focused.',
+        to: { name: 'admin-categories' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5zM12.75 6.75H19.5v6.75h-6.75zM4.5 15.75h6.75v6.75H4.5zM12.75 15.75H19.5v6.75h-6.75z" />
+        `,
+      },
+    ]
+  }
+
+  if (auth.isLearner) {
+    return [
+      {
+        label: 'Resume quiz setup',
+        description: 'Open the quiz configurator with your last saved filters.',
+        to: { name: 'quiz-setup' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 8.25h7.5M8.25 12h7.5M8.25 15.75h7.5M4.5 5.25h15v12H4.5z" />
+        `,
+        highlight: true,
+      },
+      {
+        label: 'Practice by subject',
+        description: 'Pick a category and drill questions immediately.',
+        to: { name: 'categories' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 3.75h6.75v6.75H4.5zM12.75 13.5H19.5v6.75h-6.75zM12.75 3.75h6.75v6.75h-6.75zM4.5 13.5h6.75v6.75H4.5z" />
+        `,
+      },
+      {
+        label: 'Check analytics',
+        description: 'Spot weak topics before your next attempt.',
+        to: { name: 'analytics' },
+        icon: `
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M6.75 9.75v7.5M12 4.5v12.75M17.25 12.75v4.5" />
+        `,
+      },
+    ]
+  }
+
+  return [
+    {
+      label: 'Browse categories',
+      description: 'Preview the curriculum and try sample questions.',
+      to: { name: 'categories' },
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6.75v6.75H4.5zM12.75 5.25h6.75v6.75h-6.75zM4.5 13.5h6.75v6.75H4.5zM12.75 13.5h6.75v6.75h-6.75z" />
+      `,
+      highlight: true,
+    },
+    {
+      label: 'Take a mock test',
+      description: 'Jump into a timed quiz and experience the dashboard.',
+      to: { name: 'quiz-setup' },
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12M6 12h12" />
+      `,
+    },
+    {
+      label: 'Create an account',
+      description: 'Save progress, streaks, and personalised insights.',
+      to: { name: 'register' },
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.142 0-7.5 2.014-7.5 4.5a.75.75 0 0 0 .75.75h13.5a.75.75 0 0 0 .75-.75c0-2.486-3.358-4.5-7.5-4.5Z" />
+      `,
+    },
+  ]
+})
+
+const quickActionsTitle = computed(() => {
+  if (auth.isAdmin) return 'Publish faster'
+  if (auth.isLearner) return 'Ready when you are'
+  return 'Get started quickly'
+})
+
+const quickActionsSubtitle = computed(() => {
+  if (auth.isAdmin) return 'Skip the scavenger hunt—jump straight to the studios that matter.'
+  if (auth.isLearner) return 'Re-enter your prep flow with shortcuts to the screens you use most.'
+  return 'Explore quiz content in just a couple of clicks.'
+})
 </script>
 
 <template>
@@ -370,6 +480,49 @@ onMounted(loadHomeData)
             </article>
           </template>
         </div>
+      </div>
+    </section>
+
+    <section v-if="quickActions.length" class="mx-auto max-w-6xl space-y-5 px-2">
+      <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-400">Quick actions</p>
+          <h2 class="text-2xl font-semibold text-slate-900">{{ quickActionsTitle }}</h2>
+          <p class="text-sm text-slate-500">{{ quickActionsSubtitle }}</p>
+        </div>
+      </header>
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <RouterLink
+          v-for="action in quickActions"
+          :key="action.label"
+          :to="action.to"
+          class="group flex flex-col gap-4 rounded-3xl border p-5 transition"
+          :class="action.highlight
+            ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
+            : 'border-slate-200 bg-white shadow-sm hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg'"
+        >
+          <span
+            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border transition"
+            :class="action.highlight ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200/70 bg-slate-50 text-slate-500 group-hover:border-brand-100 group-hover:bg-brand-50 group-hover:text-brand-600'"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" v-html="action.icon"></svg>
+          </span>
+          <div class="space-y-1">
+            <p class="text-lg font-semibold leading-tight" :class="action.highlight ? 'text-white' : 'text-slate-900'">
+              {{ action.label }}
+            </p>
+            <p class="text-sm" :class="action.highlight ? 'text-white/80' : 'text-slate-500'">
+              {{ action.description }}
+            </p>
+          </div>
+          <span
+            class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em]"
+            :class="action.highlight ? 'text-white/80' : 'text-brand-600 group-hover:text-brand-500'"
+          >
+            Go
+            <span aria-hidden="true">→</span>
+          </span>
+        </RouterLink>
       </div>
     </section>
 
