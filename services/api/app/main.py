@@ -13,6 +13,7 @@ from app.api.routes.practice import router as practice_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.quizzes import router as quizzes_router
 from app.api.routes.users import router as users_router
+from app.api.routes.notifications import router as notifications_router
 
 app = FastAPI(title="Loksewa Quiz Hub API", version="0.1.0")
 
@@ -36,3 +37,4 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
