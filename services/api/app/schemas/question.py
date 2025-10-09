@@ -31,6 +31,7 @@ class QuestionBase(BaseModel):
     difficulty: Optional[str] = None
     is_active: bool = True
     category_id: int
+    organization_id: Optional[int] = None
 
 
 class QuestionCreate(QuestionBase):
@@ -66,6 +67,7 @@ class QuestionSummary(BaseModel):
     option_count: int
     category_id: int
     category_name: str
+    organization_id: Optional[int]
 
     model_config = {
         "from_attributes": True,

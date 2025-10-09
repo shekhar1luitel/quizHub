@@ -20,6 +20,7 @@ class CategoryUpdate(BaseModel):
 class CategoryOut(CategoryBase):
     id: int
     slug: str
+    organization_id: int | None
 
     model_config = {"from_attributes": True}
 
@@ -28,5 +29,6 @@ class CategorySummary(BaseModel):
     id: int
     name: str
     slug: str
+    organization_id: int | None
 
     model_config = {"from_attributes": True}

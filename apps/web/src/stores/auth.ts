@@ -1,5 +1,42 @@
 import { defineStore } from 'pinia'
 
+export interface UserProfile {
+  name: string | null
+  phone: string | null
+  student_id: string | null
+  qr_code_uri: string | null
+  avatar_url: string | null
+}
+
+export interface OrganizationSummary {
+  id: number
+  name: string
+  slug: string
+  type: string | null
+  logo_url: string | null
+}
+
+export interface OrgMembershipSummary {
+  id: number
+  org_role: string
+  status: string
+  organization: OrganizationSummary
+}
+
+export interface PlatformAccount {
+  created_at: string
+}
+
+export interface OrganizationAccount {
+  organization_id: number | null
+  created_at: string
+}
+
+export interface LearnerAccount {
+  primary_org_id: number | null
+  created_at: string
+}
+
 export interface AuthUser {
   id: number
   username: string
@@ -8,6 +45,12 @@ export interface AuthUser {
   status: string
   account_type: string
   organization_id: number | null
+  organization: OrganizationSummary | null
+  profile: UserProfile | null
+  memberships: OrgMembershipSummary[]
+  platform_account: PlatformAccount | null
+  organization_account: OrganizationAccount | null
+  learner_account: LearnerAccount | null
 }
 
 const ACCESS_TOKEN_KEY = 'lqh_access_token'
@@ -27,6 +70,11 @@ export const useAuthStore = defineStore('auth', {
     isAuthenticated: (state) => Boolean(state.accessToken),
     isAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'superuser',
     isSuperuser: (state) => state.user?.role === 'superuser',
+    isOrgAdmin: (state) => state.user?.role === 'org_admin',
+    isLearner: (state) => state.user?.role === 'user' && Boolean(state.user?.learner_account),
+    isOrgManager: (state) => ['org_admin', 'admin', 'superuser'].includes(state.user?.role ?? ''),
+    activeMemberships: (state) =>
+      (state.user?.memberships ?? []).filter((membership) => membership.status === 'active'),
   },
   actions: {
     setAccessToken(token: string) {
@@ -40,7 +88,17 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     setUser(user: AuthUser | null) {
-      this.user = user
+      if (user) {
+        this.user = {
+          ...user,
+          memberships: user.memberships ?? [],
+          platform_account: user.platform_account ?? null,
+          organization_account: user.organization_account ?? null,
+          learner_account: user.learner_account ?? null,
+        }
+      } else {
+        this.user = null
+      }
     },
     async fetchCurrentUser() {
       if (!this.accessToken) {

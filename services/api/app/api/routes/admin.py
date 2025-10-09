@@ -12,7 +12,7 @@ from app.models.category import Category
 from app.models.organization import OrgMembership, Organization
 from app.models.question import Question, QuizQuestion
 from app.models.quiz import Quiz
-from app.models.user import User
+from app.models.user import LearnerUser, OrganizationUser, PlatformUser, User
 from app.schemas.admin import AdminCategorySnapshot, AdminOverview, AdminRecentQuiz, AdminTotals
 from app.schemas.management import (
     AdminNotificationCreate,
@@ -244,6 +244,13 @@ def create_admin_user(
     )
     db.add(user)
     db.flush()
+
+    if user.role in {"admin", "superuser"}:
+        db.add(PlatformUser(user_id=user.id))
+    elif user.role == "org_admin":
+        db.add(OrganizationUser(user_id=user.id, organization_id=organization_id))
+    elif user.role == "user":
+        db.add(LearnerUser(user_id=user.id, primary_org_id=user.organization_id))
 
     if organization:
         membership = (

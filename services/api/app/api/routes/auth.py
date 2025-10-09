@@ -16,7 +16,7 @@ from app.core.security import (
 )
 from app.core.config import settings
 from app.models.organization import EmailEvent
-from app.models.user import EmailVerificationToken, User
+from app.models.user import EmailVerificationToken, LearnerUser, User
 from app.schemas.auth import (
     LoginIn,
     ResendVerificationIn,
@@ -138,6 +138,9 @@ def register(data: UserCreate, db: Session = Depends(get_db_session)) -> UserOut
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
             ) from exc
+
+    learner_account = LearnerUser(user_id=user.id, primary_org_id=user.organization_id)
+    db.add(learner_account)
 
     _queue_email_verification(db, user)
     db.commit()

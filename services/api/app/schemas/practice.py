@@ -14,6 +14,7 @@ class PracticeCategorySummary(BaseModel):
     difficulty: str
     difficulties: List[str]
     quiz_id: Optional[int] = None
+    organization_id: Optional[int] = None
 
 
 class PracticeQuestionOption(BaseModel):
@@ -46,4 +47,4 @@ class PracticeCategoryDetail(BaseModel):
     total_questions: int
     difficulty: str
     questions: List[PracticeQuestion]
-
+    organization_id: Optional[int] = None

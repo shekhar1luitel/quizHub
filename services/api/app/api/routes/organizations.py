@@ -12,7 +12,8 @@ from app.api.deps import (
     require_superuser,
     require_user,
 )
-from app.models.organization import OrgMembership, Organization
+from app.core.config import settings
+from app.models.organization import OrgMembership, Organization, UserProfile
 from app.models.user import User
 from app.schemas.organization import (
     EnrollTokenCreateIn,
@@ -71,6 +72,7 @@ def create_organization(
         name=data.name.strip(),
         slug=slug,
         type=data.type.strip().lower() if data.type else None,
+        logo_url=data.logo_url.strip() if data.logo_url else None,
         status="active",
     )
     db.add(organization)
@@ -90,8 +92,14 @@ def update_organization(
     if not organization:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
 
-    if organization.status != data.status:
+    if data.status and organization.status != data.status:
         organization.status = data.status
+    if data.name and organization.name != data.name.strip():
+        organization.name = data.name.strip()
+    if data.type is not None:
+        organization.type = data.type.strip().lower() if data.type else None
+    if data.logo_url is not None:
+        organization.logo_url = data.logo_url.strip() or None
 
     db.add(organization)
     db.commit()
@@ -197,8 +205,17 @@ def create_enroll_token(
         organization_id=organization_id,
         expires_in_minutes=data.expires_in_minutes,
     )
+    join_url = f"{settings.enrollment_join_base}{token}"
+
+    profile = current_user.profile
+    if profile is None:
+        profile = UserProfile(user_id=current_user.id)
+        db.add(profile)
+        db.flush()
+    profile.qr_code_uri = join_url
+
     db.commit()
-    return EnrollTokenCreateOut(token=token, expires_at=entity.expires_at)
+    return EnrollTokenCreateOut(token=token, expires_at=entity.expires_at, enroll_url=join_url)
 
 
 @router.post("/enroll", response_model=OrganizationOut)

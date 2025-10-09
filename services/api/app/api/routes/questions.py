@@ -4,13 +4,18 @@ from typing import List, Sequence
 
 from typing import List, Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_db_session, require_admin
+from app.api.deps import (
+    get_db_session,
+    resolve_content_organization,
+    require_content_manager,
+)
 from app.models.category import Category
 from app.models.question import Option, Question
+from app.models.user import User
 from app.schemas.question import OptionCreate, QuestionCreate, QuestionOut, QuestionSummary, QuestionUpdate
 
 router = APIRouter(prefix="/questions", tags=["questions"])
@@ -18,9 +23,24 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 
 @router.get("/", response_model=List[QuestionSummary])
 def list_questions(
+    organization_id: int | None = Query(default=None),
     db: Session = Depends(get_db_session),
-    _: None = Depends(require_admin),
+    current_user: User = Depends(require_content_manager),
 ) -> List[QuestionSummary]:
+    if organization_id is not None:
+        target_org_id = resolve_content_organization(
+            current_user,
+            organization_id,
+            allow_global_for_admin=True,
+        )
+    elif current_user.role == "org_admin":
+        if current_user.organization_id is None:
+            return []
+        target_org_id = current_user.organization_id
+    elif current_user.role == "admin":
+        target_org_id = None
+    else:
+        target_org_id = None
     stmt = (
         select(
             Question.id,
@@ -29,6 +49,7 @@ def list_questions(
             Question.difficulty,
             Question.is_active,
             Question.category_id,
+            Question.organization_id,
             Category.name.label("category_name"),
             func.count(Option.id).label("option_count"),
         )
@@ -41,10 +62,17 @@ def list_questions(
             Question.difficulty,
             Question.is_active,
             Question.category_id,
+            Question.organization_id,
             Category.name,
         )
         .order_by(Question.id.desc())
     )
+    if target_org_id is not None:
+        stmt = stmt.where(Question.organization_id == target_org_id)
+    elif current_user.role == "admin":
+        stmt = stmt.where(Question.organization_id.is_(None))
+    elif current_user.role != "superuser":
+        return []
     rows = db.execute(stmt).all()
     return [
         QuestionSummary(
@@ -56,6 +84,7 @@ def list_questions(
             option_count=row.option_count,
             category_id=row.category_id,
             category_name=row.category_name,
+            organization_id=row.organization_id,
         )
         for row in rows
     ]
@@ -65,7 +94,8 @@ def list_questions(
 def get_question(
     question_id: int,
     db: Session = Depends(get_db_session),
-    _: None = Depends(require_admin),
+    current_user: User = Depends(require_content_manager),
+    organization_id: int | None = Query(default=None),
 ) -> QuestionOut:
     question = (
         db.query(Question)
@@ -75,6 +105,16 @@ def get_question(
     )
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    target_org_id = resolve_content_organization(
+        current_user,
+        organization_id if organization_id is not None else question.organization_id,
+        allow_global_for_admin=True,
+    )
+    if target_org_id is not None:
+        if question.organization_id != target_org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
+    elif current_user.role != "superuser" and question.organization_id is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
     return QuestionOut.model_validate(question)
 
 
@@ -82,10 +122,16 @@ def get_question(
 def create_question(
     payload: QuestionCreate,
     db: Session = Depends(get_db_session),
-    _: None = Depends(require_admin),
+    current_user: User = Depends(require_content_manager),
+    organization_id: int | None = Query(default=None),
 ) -> QuestionOut:
     validate_options(payload.options)
-    _ensure_category_exists(db, payload.category_id)
+    target_org_id = resolve_content_organization(
+        current_user,
+        organization_id,
+        allow_global_for_admin=True,
+    )
+    category = _ensure_category_exists(db, payload.category_id, target_org_id, current_user)
 
     question = Question(
         prompt=payload.prompt,
@@ -94,6 +140,7 @@ def create_question(
         difficulty=payload.difficulty,
         is_active=payload.is_active,
         category_id=payload.category_id,
+        organization_id=target_org_id if target_org_id is not None else category.organization_id,
     )
     db.add(question)
     db.flush()
@@ -111,7 +158,8 @@ def update_question(
     question_id: int,
     payload: QuestionUpdate,
     db: Session = Depends(get_db_session),
-    _: None = Depends(require_admin),
+    current_user: User = Depends(require_content_manager),
+    organization_id: int | None = Query(default=None),
 ) -> QuestionOut:
     question = (
         db.query(Question)
@@ -121,6 +169,16 @@ def update_question(
     )
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    target_org_id = resolve_content_organization(
+        current_user,
+        organization_id if organization_id is not None else question.organization_id,
+        allow_global_for_admin=True,
+    )
+    if target_org_id is not None:
+        if question.organization_id != target_org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
+    elif current_user.role != "superuser" and question.organization_id is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
 
     if payload.prompt is not None:
         question.prompt = payload.prompt
@@ -133,8 +191,9 @@ def update_question(
     if payload.is_active is not None:
         question.is_active = payload.is_active
     if payload.category_id is not None:
-        _ensure_category_exists(db, payload.category_id)
+        category = _ensure_category_exists(db, payload.category_id, target_org_id, current_user)
         question.category_id = payload.category_id
+        question.organization_id = target_org_id if target_org_id is not None else category.organization_id
 
     if payload.options is not None:
         validate_options(payload.options)
@@ -151,11 +210,22 @@ def update_question(
 def delete_question(
     question_id: int,
     db: Session = Depends(get_db_session),
-    _: None = Depends(require_admin),
+    current_user: User = Depends(require_content_manager),
+    organization_id: int | None = Query(default=None),
 ) -> None:
     question = db.query(Question).filter(Question.id == question_id).first()
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    target_org_id = resolve_content_organization(
+        current_user,
+        organization_id if organization_id is not None else question.organization_id,
+        allow_global_for_admin=True,
+    )
+    if target_org_id is not None:
+        if question.organization_id != target_org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
+    elif current_user.role != "superuser" and question.organization_id is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Question belongs to another organization")
     db.delete(question)
     db.commit()
 
@@ -167,7 +237,18 @@ def validate_options(options: Sequence[OptionCreate]) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mark one option as correct")
 
 
-def _ensure_category_exists(db: Session, category_id: int) -> None:
+def _ensure_category_exists(
+    db: Session,
+    category_id: int,
+    target_org_id: int | None,
+    current_user: User,
+) -> Category:
     category = db.get(Category, category_id)
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if target_org_id is not None:
+        if category.organization_id != target_org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Category belongs to another organization")
+    elif current_user.role != "superuser" and category.organization_id is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Category belongs to another organization")
+    return category

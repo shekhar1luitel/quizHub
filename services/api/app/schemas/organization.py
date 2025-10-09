@@ -10,6 +10,7 @@ class OrganizationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     slug: str = Field(min_length=1, max_length=255)
     type: str | None = Field(default=None, max_length=50)
+    logo_url: str | None = Field(default=None, max_length=512)
 
 
 class OrganizationOut(BaseModel):
@@ -19,13 +20,17 @@ class OrganizationOut(BaseModel):
     type: str | None
     status: str
     created_at: datetime
+    logo_url: str | None
 
     class Config:
         from_attributes = True
 
 
 class OrganizationUpdate(BaseModel):
-    status: Literal["active", "inactive"]
+    status: Literal["active", "inactive"] | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    type: str | None = Field(default=None, max_length=50)
+    logo_url: str | None = Field(default=None, max_length=512)
 
 
 class EnrollTokenCreateIn(BaseModel):
@@ -35,6 +40,7 @@ class EnrollTokenCreateIn(BaseModel):
 class EnrollTokenCreateOut(BaseModel):
     token: str
     expires_at: datetime
+    enroll_url: str
 
 
 class OrganizationEnrollIn(BaseModel):

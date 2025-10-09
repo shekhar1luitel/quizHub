@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.difficulty import difficulty_label, normalized_difficulty
-from app.api.deps import get_current_user, get_db_session
+from app.api.deps import get_db_session, require_learner
 from app.models.attempt import Attempt, AttemptAnswer
 from app.models.category import Category
 from app.models.question import Question, QuizQuestion
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/attempts", tags=["attempts"])
 @router.post("/", response_model=AttemptResult, status_code=status.HTTP_201_CREATED)
 def submit_attempt(
     payload: AttemptCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
 ) -> AttemptResult:
     quiz = (
@@ -50,6 +50,8 @@ def submit_attempt(
     )
     if quiz is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    if quiz.organization_id is not None and quiz.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Quiz not available for your organization")
 
     questions = [link.question for link in sorted(quiz.questions, key=lambda q: q.position) if link.question]
     if not questions:
@@ -157,14 +159,14 @@ def submit_attempt(
 
 @router.get("/history", response_model=List[AttemptHistoryEntry])
 def list_attempt_history(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
 ) -> List[AttemptHistoryEntry]:
     attempts: List[Attempt] = (
         db.query(Attempt)
         .options(selectinload(Attempt.quiz))
         .filter(Attempt.user_id == current_user.id)
-        .order_by(Attempt.submitted_at.desc())
+        .order_by(Attempt.finished_at.desc())
         .all()
     )
 
@@ -253,7 +255,7 @@ def list_attempt_history(
 @router.get("/{attempt_id}", response_model=AttemptResult)
 def get_attempt(
     attempt_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
 ) -> AttemptResult:
     attempt = (

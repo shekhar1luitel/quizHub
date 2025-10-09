@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     email_verification_expire_minutes: int = Field(default=15, ge=1, le=180)
 
     backend_cors_origins: str = "http://localhost:5173"
+    frontend_base_url: str = Field(
+        default="http://localhost:5173",
+        description="Canonical base URL for building end-user links",
+    )
 
     smtp_host: str | None = None
     smtp_port: int | None = None
@@ -64,6 +68,11 @@ class Settings(BaseSettings):
             "from_name": self.mail_from_name,
             "from_email": self.mail_from_email,
         }
+
+    @property
+    def enrollment_join_base(self) -> str:
+        base = self.frontend_base_url.rstrip("/")
+        return f"{base}/enroll?token="
 
 
 settings = Settings()

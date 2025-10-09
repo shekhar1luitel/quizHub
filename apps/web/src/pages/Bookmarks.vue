@@ -108,7 +108,7 @@ const removeBookmark = async (questionId: number) => {
 const isRemoving = (questionId: number) => Boolean(bookmarkBusy.value[questionId])
 
 const practiceFromBookmarks = () => {
-  router.push({ name: 'quiz-setup', query: { source: 'bookmarks' } })
+  router.push({ name: 'practice', params: { slug: 'bookmarks' } })
 }
 
 const formatTimestamp = (iso: string) => new Date(iso).toLocaleString()

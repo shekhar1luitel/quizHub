@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.core.security import get_password_hash  # noqa: E402
 from app.models.organization import Notification, OrgMembership  # noqa: E402
-from app.models.user import User  # noqa: E402
+from app.models.user import OrganizationUser, PlatformUser, User  # noqa: E402
 
 from .test_auth import TestingSessionLocal, client  # noqa: E402
 
@@ -23,6 +23,12 @@ def _ensure_superuser() -> None:
             select(User).where(User.email == SUPER_EMAIL)
         ).scalar_one_or_none()
         if existing:
+            platform = session.execute(
+                select(PlatformUser).where(PlatformUser.user_id == existing.id)
+            ).scalar_one_or_none()
+            if platform is None:
+                session.add(PlatformUser(user_id=existing.id))
+                session.commit()
             return
         user = User(
             email=SUPER_EMAIL,
@@ -33,6 +39,8 @@ def _ensure_superuser() -> None:
             account_type="staff",
         )
         session.add(user)
+        session.flush()
+        session.add(PlatformUser(user_id=user.id))
         session.commit()
     finally:
         session.close()
@@ -81,12 +89,21 @@ def test_admin_user_management_and_enrollment_flow():
     # create organization
     resp = client.post(
         "/api/organizations",
-        json={"name": "Test Academy", "slug": "test-academy", "type": "education"},
+        json={
+            "name": "Test Academy",
+            "slug": "test-academy",
+            "type": "education",
+            "logo_url": "https://logo.test/test-academy.png",
+        },
         headers=headers,
     )
     assert resp.status_code == 201
     organization = resp.json()
     org_id = organization["id"]
+    assert organization["logo_url"] == "https://logo.test/test-academy.png"
+
+    unauthorized_resp = client.get("/api/quizzes", params={"organization_id": org_id})
+    assert unauthorized_resp.status_code == 401
 
     # create organization admin without queuing email
     resp = client.post(
@@ -104,6 +121,16 @@ def test_admin_user_management_and_enrollment_flow():
     assert resp.status_code == 201
     admin_user = resp.json()
     assert admin_user["account_type"] == "organization_admin"
+
+    session = TestingSessionLocal()
+    try:
+        org_account = session.execute(
+            select(OrganizationUser).where(OrganizationUser.user_id == admin_user["id"])
+        ).scalar_one_or_none()
+        assert org_account is not None
+        assert org_account.organization_id == org_id
+    finally:
+        session.close()
 
     # verify notification queued for admin user
     session = TestingSessionLocal()
@@ -171,3 +198,6 @@ def test_admin_user_management_and_enrollment_flow():
     assert resp.status_code == 200
     member_list = resp.json()
     assert member_list["total"] >= 2
+
+    quizzes_resp = client.get("/api/quizzes", params={"organization_id": org_id}, headers=headers)
+    assert quizzes_resp.status_code == 200

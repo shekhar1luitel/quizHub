@@ -10,6 +10,7 @@ interface AdminCategory {
   slug: string
   description?: string | null
   icon?: string | null
+  organization_id?: number | null
 }
 
 const categories = ref<AdminCategory[]>([])

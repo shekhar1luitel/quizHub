@@ -24,6 +24,7 @@ interface OrganizationItem {
   name: string
   slug: string
   status: string
+  logo_url: string | null
 }
 
 const users = ref<AdminUser[]>([])

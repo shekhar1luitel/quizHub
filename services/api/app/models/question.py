@@ -31,6 +31,9 @@ class Question(Base):
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
     )
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     options: Mapped[List["Option"]] = relationship(
         "Option", back_populates="question", cascade="all, delete-orphan", order_by="Option.id"
@@ -39,6 +42,9 @@ class Question(Base):
         "QuizQuestion", back_populates="question", cascade="all, delete-orphan"
     )
     category: Mapped["Category"] = relationship("Category", back_populates="questions")
+    organization: Mapped["Organization | None"] = relationship(
+        "Organization", back_populates="questions"
+    )
     bookmarks: Mapped[List["Bookmark"]] = relationship(
         "Bookmark", back_populates="question", cascade="all, delete-orphan"
     )

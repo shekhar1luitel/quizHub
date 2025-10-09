@@ -80,22 +80,44 @@ def require_active_user(current_user: User = Depends(get_current_user)) -> User:
 def require_superuser(current_user: User = Depends(require_active_user)) -> User:
     if current_user.role != "superuser":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser access required")
+    if current_user.platform_account is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform user record missing")
     return current_user
 
 
 def require_admin(current_user: User = Depends(require_active_user)) -> User:
     if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    if current_user.role == "admin" and current_user.platform_account is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform user record missing")
     return current_user
 
 
 def require_org_admin_or_superuser(current_user: User = Depends(require_active_user)) -> User:
     if current_user.role not in {"org_admin", "superuser"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Org admin access required")
+    if current_user.role == "org_admin" and current_user.organization_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization not assigned")
+    return current_user
+
+
+def require_content_manager(current_user: User = Depends(require_active_user)) -> User:
+    if current_user.role not in {"org_admin", "admin", "superuser"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Content access denied")
+    if current_user.role == "org_admin" and current_user.organization_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization not assigned")
+    if current_user.role == "admin" and current_user.platform_account is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform user record missing")
     return current_user
 
 
 def require_user(current_user: User = Depends(require_active_user)) -> User:
+    return current_user
+
+
+def require_learner(current_user: User = Depends(require_active_user)) -> User:
+    if current_user.role != "user" or current_user.learner_account is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Learner access required")
     return current_user
 
 
@@ -107,3 +129,33 @@ def get_current_org_id(token: dict = Depends(get_current_token)) -> int | None:
         return int(organization_id)
     except (TypeError, ValueError):
         return None
+
+
+def resolve_content_organization(
+    current_user: User,
+    organization_id: int | None,
+    *,
+    allow_global_for_admin: bool = False,
+) -> int | None:
+    if current_user.role == "org_admin":
+        org_id = current_user.organization_id
+        if org_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization not assigned")
+        if organization_id is not None and organization_id != org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot target another organization")
+        return org_id
+
+    if current_user.role == "admin":
+        if organization_id is None:
+            if allow_global_for_admin:
+                return None
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="organization_id is required for admin scope",
+            )
+        return organization_id
+
+    if current_user.role == "superuser":
+        return organization_id
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Content access denied")

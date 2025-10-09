@@ -10,6 +10,7 @@ interface OrganizationItem {
   type: string | null
   status: string
   created_at: string
+  logo_url: string | null
 }
 
 const organizations = ref<OrganizationItem[]>([])
@@ -26,6 +27,7 @@ const form = reactive({
   name: '',
   slug: '',
   type: '',
+  logoUrl: '',
 })
 
 const slugTouched = ref(false)
@@ -60,6 +62,7 @@ const resetForm = () => {
   form.name = ''
   form.slug = ''
   form.type = ''
+  form.logoUrl = ''
   slugTouched.value = false
 }
 
@@ -99,6 +102,7 @@ const createOrganization = async () => {
       name: form.name.trim(),
       slug: form.slug.trim(),
       type: form.type.trim() || null,
+      logo_url: form.logoUrl.trim() || null,
     }
     const { data } = await http.post<OrganizationItem>('/organizations', payload)
     success.value = `Created ${data.name}.`
@@ -173,7 +177,7 @@ onMounted(() => {
         <p class="text-xs text-slate-500">Provision a new tenant so their admins can manage quizzes and learners.</p>
       </header>
 
-      <form class="mt-6 grid gap-4 md:grid-cols-3" @submit.prevent="createOrganization">
+      <form class="mt-6 grid gap-4 md:grid-cols-4" @submit.prevent="createOrganization">
         <label class="flex flex-col gap-1 text-sm text-slate-600 md:col-span-1">
           Organization name
           <input
@@ -203,7 +207,16 @@ onMounted(() => {
             placeholder="bootcamp, university, corporate..."
           />
         </label>
-        <div class="md:col-span-3">
+        <label class="flex flex-col gap-1 text-sm text-slate-600 md:col-span-1">
+          Logo URL
+          <input
+            v-model="form.logoUrl"
+            type="url"
+            class="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            placeholder="https://cdn.example.com/logo.png"
+          />
+        </label>
+        <div class="md:col-span-4">
           <button
             type="submit"
             class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
@@ -254,6 +267,7 @@ onMounted(() => {
           <thead>
             <tr class="border-b border-slate-200 text-xs uppercase tracking-widest text-slate-400">
               <th class="py-2 pr-4">Name</th>
+              <th class="py-2 pr-4">Logo</th>
               <th class="py-2 pr-4">Slug</th>
               <th class="py-2 pr-4">Type</th>
               <th class="py-2 pr-4">Status</th>
@@ -263,10 +277,10 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="6" class="py-6 text-center text-xs text-slate-400">Loading organizations...</td>
+              <td colspan="7" class="py-6 text-center text-xs text-slate-400">Loading organizations...</td>
             </tr>
             <tr v-else-if="organizations.length === 0">
-              <td colspan="6" class="py-6 text-center text-xs text-slate-400">No organizations yet.</td>
+              <td colspan="7" class="py-6 text-center text-xs text-slate-400">No organizations yet.</td>
             </tr>
             <tr
               v-for="organization in organizations"
@@ -285,6 +299,22 @@ onMounted(() => {
                   {{ organization.name }}
                 </div>
                 <p v-if="organization.status !== 'active'" class="text-xs text-amber-600">Disabled tenant</p>
+              </td>
+              <td class="py-3 pr-4">
+                <div class="h-10 w-10 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  <img
+                    v-if="organization.logo_url"
+                    :src="organization.logo_url"
+                    :alt="`${organization.name} logo`"
+                    class="h-full w-full object-contain p-1.5"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.25em] text-slate-400"
+                  >
+                    {{ organization.name.charAt(0) }}
+                  </div>
+                </div>
               </td>
               <td class="py-3 pr-4 text-xs text-slate-500">{{ organization.slug }}</td>
               <td class="py-3 pr-4 capitalize">{{ organization.type || '—' }}</td>

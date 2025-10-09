@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import type { AxiosError } from 'axios'
 
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
@@ -11,14 +12,49 @@ interface HeroQuizSummary {
   description?: string | null
   question_count: number
   is_active: boolean
+  organization_id?: number | null
 }
 
 interface PracticeCategorySummary {
   slug: string
   name: string
   description?: string | null
+  icon?: string | null
   total_questions: number
   difficulty: string
+  difficulties?: string[]
+  organization_id?: number | null
+}
+
+interface DashboardAttemptSummary {
+  id: number
+  quiz_id: number
+  quiz_title: string
+  score: number
+  submitted_at: string
+}
+
+interface DashboardCategoryAccuracy {
+  category_id: number | null
+  category_name: string
+  attempts: number
+  average_score: number
+}
+
+interface DashboardWeeklyActivity {
+  label: string
+  attempts: number
+}
+
+interface DashboardSummary {
+  total_attempts: number
+  average_score: number
+  total_correct_answers: number
+  total_questions_answered: number
+  recent_attempts: DashboardAttemptSummary[]
+  streak: number
+  category_accuracy: DashboardCategoryAccuracy[]
+  weekly_activity: DashboardWeeklyActivity[]
 }
 
 const auth = useAuthStore()
@@ -27,25 +63,198 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const featuredQuizzes = ref<HeroQuizSummary[]>([])
 const topCategories = ref<PracticeCategorySummary[]>([])
+const dashboardSummary = ref<DashboardSummary | null>(null)
+const quizMetrics = ref({ total: 0, active: 0 })
+const categoryMetrics = ref({ total: 0, questions: 0 })
 
-const primaryCtaLabel = computed(() => (auth.isAuthenticated ? 'Go to Dashboard' : 'Start Practicing'))
-const primaryCtaRoute = computed(() => (auth.isAuthenticated ? { name: 'dashboard' } : { name: 'register' }))
-const secondaryCtaLabel = computed(() => (auth.isAuthenticated ? 'Browse categories' : 'Login'))
-const secondaryCtaRoute = computed(() => (auth.isAuthenticated ? { name: 'categories' } : { name: 'login' }))
+const primaryCtaLabel = computed(() => {
+  if (!auth.isAuthenticated) return 'Start Practicing'
+  if (auth.isLearner) return 'Go to Dashboard'
+  if (auth.isSuperuser) return 'Open platform controls'
+  if (auth.isAdmin) return 'Open admin console'
+  return 'View profile'
+})
+
+const primaryCtaRoute = computed(() => {
+  if (!auth.isAuthenticated) return { name: 'register' }
+  if (auth.isLearner) return { name: 'dashboard' }
+  if (auth.isSuperuser) return { name: 'admin-organizations' }
+  if (auth.isAdmin) return { name: 'admin' }
+  return { name: 'profile' }
+})
+
+const secondaryCtaLabel = computed(() => {
+  if (!auth.isAuthenticated) return 'Login'
+  if (auth.isLearner) return 'Browse categories'
+  if (auth.isSuperuser) return 'Manage users'
+  if (auth.isAdmin) return 'Manage quizzes'
+  return 'Account settings'
+})
+
+const secondaryCtaRoute = computed(() => {
+  if (!auth.isAuthenticated) return { name: 'login' }
+  if (auth.isLearner) return { name: 'categories' }
+  if (auth.isSuperuser) return { name: 'admin-users' }
+  if (auth.isAdmin) return { name: 'admin-quizzes' }
+  return { name: 'settings' }
+})
+
+const heroHeading = computed(() => {
+  if (dashboardSummary.value) {
+    return 'Welcome back — here’s your snapshot'
+  }
+  if (auth.isAdmin) {
+    return 'Monitor platform activity at a glance'
+  }
+  return 'Practice Lok Sewa–style quizzes with instant feedback'
+})
+
+const heroDescription = computed(() => {
+  if (dashboardSummary.value) {
+    return 'Review today’s numbers, revisit analytics, and jump straight into your next quiz.'
+  }
+  if (auth.isAdmin) {
+    return 'Review active content, ensure categories stay fresh, and keep the learning experience running smoothly.'
+  }
+  return 'Build confidence with curated question banks, timed mock tests, and rich explanations. Track progress on your personal dashboard and tackle weak areas faster.'
+})
+
+const scoreColour = (value: number) => {
+  if (value >= 80) return 'text-emerald-600'
+  if (value >= 60) return 'text-amber-600'
+  return 'text-rose-600'
+}
+
+const summaryAccuracy = computed(() => {
+  if (!dashboardSummary.value || dashboardSummary.value.total_questions_answered === 0) return 0
+  return Math.round(
+    (dashboardSummary.value.total_correct_answers / dashboardSummary.value.total_questions_answered) * 100
+  )
+})
+
+const summaryCards = computed(() => {
+  if (!dashboardSummary.value) return []
+  const summary = dashboardSummary.value
+  return [
+    {
+      label: 'Total sessions',
+      value: summary.total_attempts.toString(),
+      caption: 'Completed quizzes and practice sets.',
+      valueClass: 'text-slate-900',
+    },
+    {
+      label: 'Average score',
+      value: `${summary.average_score.toFixed(1)}%`,
+      caption: 'Across all attempts.',
+      valueClass: scoreColour(summary.average_score),
+    },
+    {
+      label: 'Questions solved',
+      value: summary.total_questions_answered.toString(),
+      caption: `${summaryAccuracy.value}% accuracy · ${summary.total_correct_answers} correct`,
+      valueClass: 'text-slate-900',
+    },
+    {
+      label: 'Current streak',
+      value: summary.streak === 1 ? '1 day' : `${summary.streak} days`,
+      caption: 'Keep practising daily to grow this number.',
+      valueClass: 'text-indigo-600',
+    },
+  ]
+})
+
+const adminCards = computed(() => {
+  if (!auth.isAdmin) return []
+  const active = quizMetrics.value.active
+  const totalQuizzes = quizMetrics.value.total
+  const totalCategories = categoryMetrics.value.total
+  const totalQuestions = categoryMetrics.value.questions
+  return [
+    {
+      label: 'Active quizzes',
+      value: totalQuizzes ? `${active}/${totalQuizzes}` : `${active}`,
+      caption: totalQuizzes
+        ? 'Live quizzes vs total created.'
+        : 'Live quizzes ready for learners.',
+      valueClass: 'text-slate-900',
+    },
+    {
+      label: 'Practice categories',
+      value: totalCategories.toString(),
+      caption: 'Subjects currently published.',
+      valueClass: 'text-slate-900',
+    },
+    {
+      label: 'Question coverage',
+      value: totalQuestions.toString(),
+      caption: 'Active questions powering quizzes.',
+      valueClass: 'text-indigo-600',
+    },
+  ]
+})
 
 const loadHomeData = async () => {
   loading.value = true
   error.value = null
+  dashboardSummary.value = null
   try {
-    const [quizzesRes, categoriesRes] = await Promise.all([
-      http.get<HeroQuizSummary[]>('/quizzes'),
-      http.get<PracticeCategorySummary[]>('/practice/categories'),
-    ])
-    featuredQuizzes.value = quizzesRes.data.filter((quiz) => quiz.is_active).slice(0, 3)
-    topCategories.value = categoriesRes.data.slice(0, 4)
+    await auth.initialize()
   } catch (err) {
     console.error(err)
-    error.value = 'We could not load the latest practice data. Please try again soon.'
+  }
+
+  const fetchQuizzes = async () => {
+    try {
+      const { data } = await http.get<HeroQuizSummary[]>('/quizzes')
+      quizMetrics.value = {
+        total: data.length,
+        active: data.filter((quiz) => quiz.is_active).length,
+      }
+      featuredQuizzes.value = data.filter((quiz) => quiz.is_active).slice(0, 3)
+    } catch (err) {
+      console.error(err)
+      featuredQuizzes.value = []
+      quizMetrics.value = { total: 0, active: 0 }
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
+      categoryMetrics.value = {
+        total: data.length,
+        questions: data.reduce((sum, item) => sum + (item.total_questions ?? 0), 0),
+      }
+      topCategories.value = data.slice(0, 4)
+    } catch (err) {
+      console.error(err)
+      const status = (err as AxiosError).response?.status
+      if (status === 401 || status === 403) {
+        topCategories.value = []
+        error.value = null
+      } else {
+        error.value = 'We could not load the latest practice data. Please try again soon.'
+      }
+      categoryMetrics.value = { total: 0, questions: 0 }
+    }
+  }
+
+  const fetchSummary = async () => {
+    if (!auth.isLearner) {
+      dashboardSummary.value = null
+      return
+    }
+    try {
+      const { data } = await http.get<DashboardSummary>('/dashboard/summary')
+      dashboardSummary.value = data
+    } catch (err) {
+      console.error(err)
+      dashboardSummary.value = null
+    }
+  }
+
+  try {
+    await Promise.all([fetchQuizzes(), fetchCategories(), fetchSummary()])
   } finally {
     loading.value = false
   }
@@ -64,11 +273,10 @@ onMounted(loadHomeData)
           </span>
           <div class="space-y-4">
             <h1 class="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl">
-              Practice Lok Sewa–style quizzes with instant feedback
+              {{ heroHeading }}
             </h1>
             <p class="text-sm text-slate-600 sm:text-base">
-              Build confidence with curated question banks, timed mock tests, and rich explanations. Track progress on
-              your personal dashboard and tackle weak areas faster.
+              {{ heroDescription }}
             </p>
           </div>
           <div class="flex flex-col gap-3 sm:flex-row">
@@ -86,7 +294,33 @@ onMounted(loadHomeData)
               {{ secondaryCtaLabel }}
             </RouterLink>
           </div>
-          <dl class="grid gap-4 sm:grid-cols-3">
+          <dl v-if="dashboardSummary" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div
+              v-for="card in summaryCards"
+              :key="card.label"
+              class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm"
+            >
+              <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{{ card.label }}</dt>
+              <dd class="mt-2">
+                <p :class="['text-2xl font-semibold', card.valueClass]">{{ card.value }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ card.caption }}</p>
+              </dd>
+            </div>
+          </dl>
+          <dl v-else-if="adminCards.length" class="grid gap-4 sm:grid-cols-3">
+            <div
+              v-for="card in adminCards"
+              :key="card.label"
+              class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm"
+            >
+              <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{{ card.label }}</dt>
+              <dd class="mt-2">
+                <p :class="['text-2xl font-semibold', card.valueClass]">{{ card.value }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ card.caption }}</p>
+              </dd>
+            </div>
+          </dl>
+          <dl v-else class="grid gap-4 sm:grid-cols-3">
             <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm">
               <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Instant results</dt>
               <dd class="mt-2 text-base font-semibold text-slate-900">See correct answers and explanations right away.</dd>

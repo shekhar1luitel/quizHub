@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.organization import EnrollToken, OrgMembership, Organization, UserProfile
-from app.models.user import User
+from app.models.user import LearnerUser, User
 
 
 class EnrollmentService:
@@ -74,6 +74,13 @@ class EnrollmentService:
         user.organization_id = organization.id
         user.account_type = "organization_member"
         enroll_token.used_by_user_id = user.id
+
+        learner_account = user.learner_account
+        if learner_account is None:
+            learner_account = LearnerUser(user_id=user.id, primary_org_id=organization.id)
+            self.db.add(learner_account)
+        else:
+            learner_account.primary_org_id = organization.id
 
         profile = user.profile
         if profile is None:

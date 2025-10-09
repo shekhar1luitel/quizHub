@@ -74,6 +74,15 @@ class User(Base):
         cascade="all, delete-orphan",
         order_by="EmailVerificationToken.created_at.desc()",
     )
+    platform_account: Mapped["PlatformUser | None"] = relationship(
+        "PlatformUser", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    organization_account: Mapped["OrganizationUser | None"] = relationship(
+        "OrganizationUser", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    learner_account: Mapped["LearnerUser | None"] = relationship(
+        "LearnerUser", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class EmailVerificationToken(Base):
@@ -87,3 +96,40 @@ class EmailVerificationToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="verification_tokens")
+
+
+class PlatformUser(Base):
+    __tablename__ = "platform_users"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="platform_account")
+
+
+class OrganizationUser(Base):
+    __tablename__ = "organization_users"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="organization_account")
+    organization: Mapped["Organization | None"] = relationship("Organization", back_populates="organization_accounts")
+
+
+class LearnerUser(Base):
+    __tablename__ = "learner_users"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    primary_org_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="learner_account")
+    primary_organization: Mapped["Organization | None"] = relationship(
+        "Organization", back_populates="learner_accounts"
+    )

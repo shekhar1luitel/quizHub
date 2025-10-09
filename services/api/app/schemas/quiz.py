@@ -13,6 +13,7 @@ class QuizBase(BaseModel):
 
 class QuizCreate(QuizBase):
     question_ids: List[int] = Field(default_factory=list)
+    organization_id: Optional[int] = None
 
 
 class QuizUpdate(BaseModel):
@@ -20,6 +21,7 @@ class QuizUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
     question_ids: Optional[List[int]] = None
+    organization_id: Optional[int] = None
 
 
 class QuizSummary(BaseModel):
@@ -28,6 +30,7 @@ class QuizSummary(BaseModel):
     description: Optional[str]
     is_active: bool
     question_count: int
+    organization_id: Optional[int]
 
     model_config = {
         "from_attributes": True,
@@ -61,6 +64,7 @@ class QuizDetail(BaseModel):
     description: Optional[str]
     is_active: bool
     questions: List[QuizQuestion]
+    organization_id: Optional[int]
 
     model_config = {
         "from_attributes": True,

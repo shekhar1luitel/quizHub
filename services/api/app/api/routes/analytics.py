@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db_session
+from app.api.deps import get_db_session, require_learner
 from app.models.attempt import Attempt, AttemptAnswer
 from app.models.category import Category
 from app.models.question import Question
@@ -50,13 +50,13 @@ def _calculate_streak(attempts: Iterable[Attempt]) -> int:
 
 @router.get("/overview", response_model=AnalyticsOverview)
 def get_analytics_overview(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
 ) -> AnalyticsOverview:
     attempts: List[Attempt] = (
         db.query(Attempt)
         .filter(Attempt.user_id == current_user.id)
-        .order_by(Attempt.submitted_at.asc())
+        .order_by(Attempt.finished_at.asc())
         .all()
     )
 
@@ -124,7 +124,7 @@ def get_analytics_overview(
         category_rows = db.execute(
             select(
                 Attempt.id.label("attempt_id"),
-                Attempt.submitted_at,
+                Attempt.finished_at.label("submitted_at"),
                 Category.name.label("category_name"),
                 func.count(AttemptAnswer.id).label("answered"),
                 func.sum(case((AttemptAnswer.is_correct.is_(True), 1), else_=0)).label("correct"),
@@ -133,8 +133,8 @@ def get_analytics_overview(
             .join(Question, Question.id == AttemptAnswer.question_id)
             .join(Category, Category.id == Question.category_id)
             .where(Attempt.id.in_(attempt_ids))
-            .group_by(Attempt.id, Attempt.submitted_at, Category.id)
-            .order_by(Category.name, Attempt.submitted_at)
+            .group_by(Attempt.id, Attempt.finished_at, Category.id)
+            .order_by(Category.name, Attempt.finished_at)
         ).all()
 
         category_history: Dict[str, List[tuple[datetime, float]]] = defaultdict(list)

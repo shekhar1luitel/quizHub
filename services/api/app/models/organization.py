@@ -17,6 +17,7 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[str] = mapped_column(
         Enum("active", "inactive", name="organization_status_enum", native_enum=False),
         nullable=False,
@@ -37,6 +38,18 @@ class Organization(Base):
     configs: Mapped[List["AppConfig"]] = relationship(
         "AppConfig", back_populates="organization", cascade="all, delete-orphan"
     )
+    organization_accounts: Mapped[List["OrganizationUser"]] = relationship(
+        "OrganizationUser", back_populates="organization", cascade="all, delete-orphan"
+    )
+    learner_accounts: Mapped[List["LearnerUser"]] = relationship(
+        "LearnerUser", back_populates="primary_organization", cascade="all, delete-orphan"
+    )
+    categories: Mapped[List["Category"]] = relationship(
+        "Category", back_populates="organization", cascade="all, delete-orphan"
+    )
+    questions: Mapped[List["Question"]] = relationship(
+        "Question", back_populates="organization", cascade="all, delete-orphan"
+    )
 
 
 class UserProfile(Base):
@@ -49,6 +62,7 @@ class UserProfile(Base):
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     student_id: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     qr_code_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="profile")

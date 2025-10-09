@@ -18,6 +18,9 @@ from app.models import (
     Question,
     Quiz,
     QuizQuestion,
+    LearnerUser,
+    OrganizationUser,
+    PlatformUser,
     User,
     UserProfile,
 )
@@ -37,52 +40,57 @@ class QuizSpec:
 
 
 ORGANIZATIONS = [
-    {"slug": "acme-academy", "name": "Acme Academy", "type": "education"},
+    {
+        "slug": "acme-academy",
+        "name": "Acme Academy",
+        "type": "education",
+        "logo_url": "https://cdn.quizhub.example/assets/acme-logo.png",
+    },
 ]
 
 USERS = [
     {
-        "email": "superuser@example.com",
+        "email": "superuser@gmail.com",
         "username": "superuser",
         "role": "superuser",
         "account_type": "staff",
         "organization_slug": None,
         "membership_role": None,
-        "profile": {"name": "Super Admin"},
-    },
-    {
-        "email": "admin@acme.test",
-        "username": "acmeadmin",
-        "role": "org_admin",
-        "account_type": "organization_admin",
-        "organization_slug": "acme-academy",
-        "membership_role": "org_admin",
-        "profile": {"name": "Asha Admin"},
-    },
-    {
-        "email": "instructor@acme.test",
-        "username": "acmeinstructor",
-        "role": "admin",
-        "account_type": "staff",
-        "organization_slug": "acme-academy",
-        "membership_role": "instructor",
-        "profile": {"name": "Ian Instructor"},
+        "profile": {
+            "name": "Super Admin",
+            "avatar_url": "https://cdn.quizhub.example/avatars/superuser.png",
+        },
     },
     {
         "email": "learner@acme.test",
-        "username": "acmelearner",
+        "username": "learner",
         "role": "user",
         "account_type": "organization_member",
         "organization_slug": "acme-academy",
         "membership_role": "member",
-        "profile": {"name": "Lina Learner"},
+        "profile": {
+            "name": "Lina Learner",
+            "avatar_url": "https://cdn.quizhub.example/avatars/learner.png",
+        },
     },
 ]
 
 CATEGORIES = [
-    {"name": "Mathematics", "description": "Numbers, algebra, and problem solving."},
-    {"name": "Science", "description": "Physics, chemistry, and general science topics."},
-    {"name": "General Knowledge", "description": "Everyday facts and current affairs."},
+    {
+        "organization_slug": "acme-academy",
+        "name": "Mathematics",
+        "description": "Numbers, algebra, and problem solving.",
+    },
+    {
+        "organization_slug": "acme-academy",
+        "name": "Science",
+        "description": "Physics, chemistry, and general science topics.",
+    },
+    {
+        "organization_slug": "acme-academy",
+        "name": "General Knowledge",
+        "description": "Everyday facts and current affairs.",
+    },
 ]
 
 QUESTIONS = [
@@ -237,6 +245,7 @@ class Seeder:
                     name=record["name"],
                     slug=slug,
                     type=record.get("type"),
+                    logo_url=record.get("logo_url"),
                     status="active",
                 )
                 self.session.add(organization)
@@ -245,6 +254,7 @@ class Seeder:
             else:
                 organization.name = record["name"]
                 organization.type = record.get("type")
+                organization.logo_url = record.get("logo_url")
                 organization.status = "active"
             self.organizations[slug] = organization
 
@@ -252,6 +262,8 @@ class Seeder:
         self._ensure_autoincrement_sequence(Category)
         for record in CATEGORIES:
             slug = slugify(record["name"])
+            org_slug = record.get("organization_slug")
+            organization = self.organizations.get(org_slug) if org_slug else None
             category = self.session.execute(
                 select(Category).where(Category.slug == slug)
             ).scalar_one_or_none()
@@ -265,6 +277,7 @@ class Seeder:
                     slug=slug,
                     description=record.get("description"),
                     icon=record.get("icon"),
+                    organization_id=organization.id if organization else None,
                 )
                 self.session.add(category)
                 self.session.flush()
@@ -274,6 +287,7 @@ class Seeder:
                 category.slug = slug
                 category.description = record.get("description")
                 category.icon = record.get("icon")
+                category.organization_id = organization.id if organization else None
             self.categories[slug] = category
 
     def _ensure_autoincrement_sequence(self, model: type[Category]) -> None:
@@ -311,7 +325,13 @@ class Seeder:
         for record in USERS:
             stmt = (
                 select(User)
-                .options(selectinload(User.profile), selectinload(User.memberships))
+                .options(
+                    selectinload(User.profile),
+                    selectinload(User.memberships),
+                    selectinload(User.platform_account),
+                    selectinload(User.organization_account),
+                    selectinload(User.learner_account),
+                )
                 .where(User.email == record["email"])
             )
             user = self.session.execute(stmt).scalar_one_or_none()
@@ -354,10 +374,15 @@ class Seeder:
             profile_data = record.get("profile")
             if profile_data:
                 if user.profile is None:
-                    profile = UserProfile(user_id=user.id, name=profile_data.get("name"))
+                    profile = UserProfile(
+                        user_id=user.id,
+                        name=profile_data.get("name"),
+                        avatar_url=profile_data.get("avatar_url"),
+                    )
                     self.session.add(profile)
                 else:
                     user.profile.name = profile_data.get("name")
+                    user.profile.avatar_url = profile_data.get("avatar_url")
 
             membership_role = record.get("membership_role")
             if membership_role and organization:
@@ -376,6 +401,44 @@ class Seeder:
                 else:
                     membership.org_role = membership_role
                     membership.status = "active"
+
+            self._ensure_role_accounts(user)
+
+    def _ensure_role_accounts(self, user: User) -> None:
+        user_id = user.id
+
+        platform = self.session.execute(
+            select(PlatformUser).where(PlatformUser.user_id == user_id)
+        ).scalar_one_or_none()
+        if user.role in {"admin", "superuser"}:
+            if platform is None:
+                self.session.add(PlatformUser(user_id=user_id))
+        elif platform is not None:
+            self.session.delete(platform)
+
+        org_account = self.session.execute(
+            select(OrganizationUser).where(OrganizationUser.user_id == user_id)
+        ).scalar_one_or_none()
+        if user.role == "org_admin":
+            org_id = user.organization_id
+            if org_account is None:
+                self.session.add(OrganizationUser(user_id=user_id, organization_id=org_id))
+            else:
+                org_account.organization_id = org_id
+        elif org_account is not None:
+            self.session.delete(org_account)
+
+        learner_account = self.session.execute(
+            select(LearnerUser).where(LearnerUser.user_id == user_id)
+        ).scalar_one_or_none()
+        if user.role == "user":
+            primary_org = user.organization_id
+            if learner_account is None:
+                self.session.add(LearnerUser(user_id=user_id, primary_org_id=primary_org))
+            else:
+                learner_account.primary_org_id = primary_org
+        elif learner_account is not None:
+            self.session.delete(learner_account)
 
     def seed_questions(self) -> None:
         for record in QUESTIONS:
@@ -402,6 +465,7 @@ class Seeder:
                     text_ne=None,
                     category_id=category.id,
                     is_active=True,
+                    organization_id=category.organization_id,
                 )
                 self.session.add(question)
                 self.session.flush()
@@ -414,6 +478,7 @@ class Seeder:
                 question.text_en = record.get("prompt")
                 question.category_id = category.id
                 question.is_active = True
+                question.organization_id = category.organization_id
 
             existing_options = {option.text: option for option in question.options}
             for option_spec in record["options"]:

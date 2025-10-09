@@ -4,11 +4,11 @@ import { pinia } from '../stores'
 
 const routes = [
   { path: '/', name: 'home', component: () => import('../pages/Home.vue'), meta: { title: 'Home' } },
-  { path: '/quiz/setup', name: 'quiz-setup', component: () => import('../pages/QuizSetup.vue'), meta: { requiresAuth: true, title: 'Quiz Setup' } },
-  { path: '/bookmarks', name: 'bookmarks', component: () => import('../pages/Bookmarks.vue'), meta: { requiresAuth: true, title: 'Bookmarks' } },
+  { path: '/quiz/setup', name: 'quiz-setup', component: () => import('../pages/QuizSetup.vue'), meta: { requiresAuth: true, requiresLearner: true, title: 'Quiz Setup' } },
+  { path: '/bookmarks', name: 'bookmarks', component: () => import('../pages/Bookmarks.vue'), meta: { requiresAuth: true, requiresLearner: true, title: 'Bookmarks' } },
   { path: '/categories', name: 'categories', component: () => import('../pages/Categories.vue'), meta: { title: 'Categories' } },
-  { path: '/practice/:slug', name: 'practice', component: () => import('../pages/Practice.vue'), props: true, meta: { title: 'Practice' } },
-  { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true, meta: { title: 'Quiz' } },
+  { path: '/practice/:slug', name: 'practice', component: () => import('../pages/Practice.vue'), props: true, meta: { requiresAuth: true, requiresLearner: true, title: 'Practice' } },
+  { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true, meta: { requiresAuth: true, requiresLearner: true, title: 'Quiz' } },
   {
     path: '/notifications',
     name: 'notifications',
@@ -16,29 +16,54 @@ const routes = [
     meta: { requiresAuth: true, title: 'Notifications' },
   },
   {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('../pages/Settings.vue'),
+    meta: { requiresAuth: true, title: 'Settings' },
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('../pages/Profile.vue'),
+    meta: { requiresAuth: true, title: 'Profile' },
+  },
+  {
     path: '/results/:id',
     name: 'results',
     component: () => import('../pages/Results.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresLearner: true },
     props: true,
   },
   {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('../pages/Dashboard.vue'),
-    meta: { requiresAuth: true, title: 'Dashboard' },
+    meta: { requiresAuth: true, requiresLearner: true, title: 'Dashboard' },
+  },
+  {
+    path: '/org/dashboard',
+    name: 'org-dashboard',
+    component: () => import('../pages/OrgDashboard.vue'),
+    meta: { requiresAuth: true, requiresOrgAdmin: true, title: 'Institution Dashboard' },
   },
   {
     path: '/history',
     name: 'history',
     component: () => import('../pages/History.vue'),
-    meta: { requiresAuth: true, title: 'History' },
+    meta: { requiresAuth: true, requiresLearner: true, title: 'History' },
+  },
+  {
+    path: '/institutions/:slug',
+    name: 'institution',
+    component: () => import('../pages/Institution.vue'),
+    props: true,
+    meta: { requiresAuth: true, title: 'Institution Hub' },
   },
   {
     path: '/analytics',
     name: 'analytics',
     component: () => import('../pages/Analytics.vue'),
-    meta: { requiresAuth: true, title: 'Analytics' },
+    meta: { requiresAuth: true, requiresLearner: true, title: 'Analytics' },
   },
   {
     path: '/admin',
@@ -123,6 +148,14 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.requiresLearner && auth.isAuthenticated && !auth.isLearner) {
+    return { name: 'home' }
+  }
+
+  if (to.meta.requiresOrgAdmin && auth.isAuthenticated && !auth.isOrgAdmin) {
+    return { name: 'home' }
   }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {

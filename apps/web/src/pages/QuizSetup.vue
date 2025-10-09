@@ -10,6 +10,7 @@ interface QuizSummary {
   description?: string | null
   is_active: boolean
   question_count: number
+  organization_id?: number | null
 }
 
 interface PracticeCategorySummary {
@@ -19,6 +20,9 @@ interface PracticeCategorySummary {
   description?: string | null
   difficulty: string
   total_questions: number
+  icon?: string | null
+  difficulties?: string[]
+  organization_id?: number | null
 }
 
 type TimeLimitOption = 10 | 15 | 20

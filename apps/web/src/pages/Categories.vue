@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import type { AxiosError } from 'axios'
 
 import { http } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Mixed'
 type DifficultyFilter = 'All' | Difficulty
@@ -16,6 +18,7 @@ interface PracticeCategorySummary {
   difficulty: string
   difficulties: string[]
   quiz_id?: number | null
+  organization_id?: number | null
 }
 
 interface DisplayCategory {
@@ -37,6 +40,9 @@ const selectedDifficulty = ref<DifficultyFilter>('All')
 const loading = ref(true)
 const error = ref('')
 const categories = ref<PracticeCategorySummary[]>([])
+
+const auth = useAuthStore()
+const inactiveMessage = ref('')
 
 const normalizeDifficulty = (value: string | null | undefined): Difficulty => {
   if (!value) return 'Mixed'
@@ -89,12 +95,29 @@ const difficultyClasses = (difficulty: Difficulty) => {
 const loadCategories = async () => {
   loading.value = true
   error.value = ''
+  inactiveMessage.value = ''
+  categories.value = []
+  await auth.initialize()
+
   try {
     const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
     categories.value = data
+    if (auth.isAuthenticated && !auth.isLearner && data.length === 0) {
+      inactiveMessage.value =
+        'Practice categories are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
+    }
   } catch (err) {
-    error.value = 'Unable to load categories.'
     console.error(err)
+    const status = (err as AxiosError).response?.status ?? 0
+    if (status === 401) {
+      inactiveMessage.value = 'Sign in as a learner to explore personalized practice categories.'
+    } else if (status === 403) {
+      inactiveMessage.value = auth.isLearner
+        ? 'We were unable to load practice categories for this account. Please contact your administrator.'
+        : 'Practice categories are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
+    } else {
+      error.value = 'Unable to load categories.'
+    }
   } finally {
     loading.value = false
   }
@@ -157,6 +180,9 @@ onMounted(loadCategories)
       class="rounded-3xl border border-red-200 bg-red-50 p-10 text-center text-sm text-red-600"
     >
       {{ error }}
+    </p>
+    <p v-else-if="inactiveMessage" class="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-700">
+      {{ inactiveMessage }}
     </p>
 
     <div

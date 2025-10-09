@@ -9,6 +9,7 @@ interface OrganizationItem {
   name: string
   slug: string
   status: string
+  logo_url: string | null
 }
 
 interface OrgMember {
@@ -51,6 +52,7 @@ const error = ref('')
 const tokenSuccess = ref('')
 const generatedToken = ref<EnrollTokenResponse | null>(null)
 const isOrganizationDisabled = computed(() => organization.value?.status === 'inactive')
+const organizationLogo = computed(() => organization.value?.logo_url ?? null)
 
 const tokenForm = reactive({ expires_in_minutes: 1440 })
 
@@ -118,13 +120,18 @@ onMounted(() => {
         Organization directory
       </div>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 class="text-3xl font-semibold text-slate-900">
-            {{ organization?.name || `Organization #${organizationId}` }}
-          </h1>
-          <p class="text-sm text-slate-500">
-            Monitor members, invite learners, and keep records up to date for institutional customers.
-          </p>
+        <div class="flex items-start gap-3">
+          <div v-if="organizationLogo" class="h-12 w-12 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <img :src="organizationLogo" :alt="`${organization?.name ?? `Organization #${organizationId}`} logo`" class="h-full w-full object-contain p-1.5" />
+          </div>
+          <div>
+            <h1 class="text-3xl font-semibold text-slate-900">
+              {{ organization?.name || `Organization #${organizationId}` }}
+            </h1>
+            <p class="text-sm text-slate-500">
+              Monitor members, invite learners, and keep records up to date for institutional customers.
+            </p>
+          </div>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
           <span class="font-semibold text-slate-900">{{ totalMembers }}</span>

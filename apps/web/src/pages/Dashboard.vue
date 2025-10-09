@@ -11,12 +11,27 @@ interface AttemptSummary {
   submitted_at: string
 }
 
+interface CategoryAccuracy {
+  category_id: number | null
+  category_name: string
+  attempts: number
+  average_score: number
+}
+
+interface WeeklyActivityEntry {
+  label: string
+  attempts: number
+}
+
 interface DashboardSummary {
   total_attempts: number
   average_score: number
   total_correct_answers: number
   total_questions_answered: number
   recent_attempts: AttemptSummary[]
+  streak: number
+  category_accuracy: CategoryAccuracy[]
+  weekly_activity: WeeklyActivityEntry[]
 }
 
 const loading = ref(true)
@@ -41,6 +56,30 @@ const attemptAccuracy = computed(() => {
   if (!summary.value || summary.value.total_questions_answered === 0) return 0
   return Math.round((summary.value.total_correct_answers / summary.value.total_questions_answered) * 100)
 })
+
+const streakLabel = computed(() => {
+  if (!summary.value) return '0 days'
+  const value = summary.value.streak
+  if (value === 1) return '1 day'
+  return `${value} days`
+})
+
+const topCategories = computed(() => {
+  if (!summary.value) return []
+  return summary.value.category_accuracy.slice(0, 5)
+})
+
+const weeklyActivity = computed(() => summary.value?.weekly_activity ?? [])
+const hasWeeklyActivity = computed(() => weeklyActivity.value.length > 0)
+const hasCategoryData = computed(() => topCategories.value.length > 0)
+
+const scoreClass = (score: number) => {
+  if (score >= 80) return 'text-emerald-600'
+  if (score >= 60) return 'text-amber-600'
+  return 'text-rose-600'
+}
+
+const progressWidth = (score: number) => `${Math.min(Math.max(score, 0), 100)}%`
 
 const improvementHint = computed(() => {
   if (!summary.value) return 'Complete quizzes to unlock insights.'
@@ -95,42 +134,100 @@ onMounted(loadDashboard)
         <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Questions solved</p>
           <p class="mt-3 text-3xl font-semibold text-slate-900">{{ summary.total_questions_answered }}</p>
-          <p class="mt-2 text-xs text-slate-500">{{ attemptAccuracy }}% accuracy</p>
+          <p class="mt-2 text-xs text-slate-500">
+            {{ attemptAccuracy }}% accuracy · {{ summary.total_correct_answers }} correct
+          </p>
         </article>
         <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Correct answers</p>
-          <p class="mt-3 text-3xl font-semibold text-slate-900">{{ summary.total_correct_answers }}</p>
-          <p class="mt-2 text-xs text-slate-500">Keep refining tough topics.</p>
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Current streak</p>
+          <p class="mt-3 text-3xl font-semibold text-slate-900">{{ streakLabel }}</p>
+          <p class="mt-2 text-xs text-slate-500">Keep the habit going every day.</p>
         </article>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-[3fr,2fr]">
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <header class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-            <div>
-              <h2 class="text-base font-semibold text-slate-900">Recent attempts</h2>
-              <p class="text-xs text-slate-500">Review how you performed in your last sessions.</p>
-            </div>
-          </header>
-          <div v-if="summary.recent_attempts.length === 0" class="p-6 text-sm text-slate-500">
-            You haven’t completed any quizzes yet. Start one from the home page.
-          </div>
-          <ul v-else class="divide-y divide-slate-200 text-sm">
-            <li
-              v-for="attempt in summary.recent_attempts"
-              :key="attempt.id"
-              class="flex items-center justify-between gap-4 px-6 py-4"
-            >
+        <div class="space-y-6">
+          <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <header class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <p class="font-semibold text-slate-900">{{ attempt.quiz_title || 'Untitled quiz' }}</p>
-                <p class="text-xs text-slate-500">{{ formatDate(attempt.submitted_at) }}</p>
+                <h2 class="text-base font-semibold text-slate-900">Recent attempts</h2>
+                <p class="text-xs text-slate-500">Review how you performed in your last sessions.</p>
               </div>
-              <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-                {{ attempt.score.toFixed(1) }}%
-              </span>
-            </li>
-          </ul>
-        </section>
+            </header>
+            <div v-if="summary.recent_attempts.length === 0" class="p-6 text-sm text-slate-500">
+              You haven’t completed any quizzes yet. Start one from the home page.
+            </div>
+            <ul v-else class="divide-y divide-slate-200 text-sm">
+              <li
+                v-for="attempt in summary.recent_attempts"
+                :key="attempt.id"
+                class="flex items-center justify-between gap-4 px-6 py-4"
+              >
+                <div>
+                  <p class="font-semibold text-slate-900">{{ attempt.quiz_title || 'Untitled quiz' }}</p>
+                  <p class="text-xs text-slate-500">{{ formatDate(attempt.submitted_at) }}</p>
+                </div>
+                <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+                  {{ attempt.score.toFixed(1) }}%
+                </span>
+              </li>
+            </ul>
+          </section>
+
+          <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <header class="flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-semibold text-slate-900">Category performance</h2>
+                <p class="text-xs text-slate-500">Spot your strongest and weakest areas.</p>
+              </div>
+            </header>
+            <p v-if="!hasCategoryData" class="mt-4 text-sm text-slate-500">
+              Attempt a few quizzes to unlock category-level insights.
+            </p>
+            <ul v-else class="mt-4 space-y-3 text-sm">
+              <li
+                v-for="category in topCategories"
+                :key="`${category.category_id ?? 'general'}-${category.category_name}`"
+                class="rounded-2xl border border-slate-200 p-4"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-semibold text-slate-900">{{ category.category_name }}</p>
+                    <p class="text-xs text-slate-500">{{ category.attempts }} sessions</p>
+                  </div>
+                  <span :class="['text-sm font-semibold', scoreClass(category.average_score)]">
+                    {{ category.average_score.toFixed(1) }}%
+                  </span>
+                </div>
+                <div class="mt-3 h-2 rounded-full bg-slate-100">
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
+                    :style="{ width: progressWidth(category.average_score) }"
+                  />
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section v-if="hasWeeklyActivity" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <header class="flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-semibold text-slate-900">Weekly activity</h2>
+                <p class="text-xs text-slate-500">Stay consistent with your study rhythm.</p>
+              </div>
+            </header>
+            <ul class="mt-4 space-y-3 text-sm">
+              <li
+                v-for="entry in weeklyActivity"
+                :key="entry.label"
+                class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3"
+              >
+                <span class="font-semibold text-slate-900">{{ entry.label }}</span>
+                <span class="text-xs text-slate-500">{{ entry.attempts }} {{ entry.attempts === 1 ? 'session' : 'sessions' }}</span>
+              </li>
+            </ul>
+          </section>
+        </div>
 
         <aside class="space-y-6">
           <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -154,6 +251,15 @@ onMounted(loadDashboard)
                   :class="{ 'pointer-events-none opacity-50': summary.recent_attempts.length === 0 }"
                 >
                   <span>Review latest results</span>
+                  <span aria-hidden="true">→</span>
+                </RouterLink>
+              </li>
+              <li>
+                <RouterLink
+                  :to="{ name: 'bookmarks' }"
+                  class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 transition hover:border-slate-300"
+                >
+                  <span>Revise bookmarked questions</span>
                   <span aria-hidden="true">→</span>
                 </RouterLink>
               </li>

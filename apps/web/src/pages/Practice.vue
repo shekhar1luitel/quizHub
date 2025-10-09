@@ -28,6 +28,7 @@ interface PracticeCategoryDetail {
   total_questions: number
   difficulty: string
   questions: PracticeQuestionResponse[]
+  organization_id?: number | null
 }
 
 interface PracticeQuestionView {
@@ -41,6 +42,7 @@ interface PracticeQuestionView {
 
 const route = useRoute()
 const categorySlug = computed(() => String(route.params.slug || ''))
+const isBookmarkRevision = computed(() => categorySlug.value === 'bookmarks')
 
 const category = ref<PracticeCategoryDetail | null>(null)
 const questions = ref<PracticeQuestionView[]>([])
@@ -83,6 +85,12 @@ const transformQuestion = (question: PracticeQuestionResponse): PracticeQuestion
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 
 const categoryIcon = computed(() => category.value?.icon?.trim() || fallbackIcon)
+const backDestination = computed(() =>
+  isBookmarkRevision.value ? { name: 'bookmarks' } : { name: 'categories' }
+)
+const backLabel = computed(() =>
+  isBookmarkRevision.value ? 'Back to bookmarks' : 'Back to categories'
+)
 
 const selectAnswer = (optionIndex: number) => {
   if (showResult.value) return
@@ -139,12 +147,22 @@ const difficultyBadge = (difficulty: Difficulty) => {
   }
 }
 
+const emptyStateMessage = computed(() =>
+  isBookmarkRevision.value
+    ? 'You haven’t bookmarked any questions yet. Save questions during quizzes to build a personalised revision set.'
+    : 'No practice questions are available for this category yet. Add new questions from the admin panel to get started.'
+)
+
 const loadPracticeSet = async () => {
   if (!categorySlug.value) return
   loading.value = true
   error.value = ''
   try {
-    const { data } = await http.get<PracticeCategoryDetail>(`/practice/categories/${categorySlug.value}`)
+    const endpoint =
+      categorySlug.value === 'bookmarks'
+        ? '/practice/bookmarks'
+        : `/practice/categories/${categorySlug.value}`
+    const { data } = await http.get<PracticeCategoryDetail>(endpoint)
     category.value = data
     questions.value = data.questions.map(transformQuestion)
     resetState()
@@ -169,11 +187,11 @@ loadPracticeSet()
   <section class="space-y-8">
     <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <RouterLink
-        :to="{ name: 'categories' }"
+        :to="backDestination"
         class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
       >
         <span aria-hidden="true">←</span>
-        Back to categories
+        {{ backLabel }}
       </RouterLink>
       <div class="flex flex-1 items-start gap-4">
         <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900/10 text-2xl">
@@ -212,7 +230,7 @@ loadPracticeSet()
       v-else-if="questions.length === 0"
       class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
     >
-      No practice questions are available for this category yet. Add new questions from the admin panel to get started.
+      {{ emptyStateMessage }}
     </p>
 
     <article v-else class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

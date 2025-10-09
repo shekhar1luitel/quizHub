@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { http } from '../../api/http'
+import { useAuthStore } from '../../stores/auth'
 
 interface AdminTotals {
   total_quizzes: number
@@ -37,6 +38,15 @@ const loading = ref(true)
 const error = ref('')
 const overview = ref<AdminOverview | null>(null)
 
+const auth = useAuthStore()
+const isSuperuser = computed(() => auth.isSuperuser)
+const platformTitle = computed(() => (isSuperuser.value ? 'Platform Dashboard' : 'Admin Dashboard'))
+const platformSubtitle = computed(() =>
+  isSuperuser.value
+    ? 'Monitor tenant health, mail delivery, and configuration across the entire platform.'
+    : 'Oversee quiz quality, question coverage, and category balance in one place.'
+)
+
 const totals = computed(() => overview.value?.totals)
 
 const loadOverview = async () => {
@@ -66,13 +76,13 @@ const quizHealth = computed(() => {
   <section class="space-y-10">
     <header class="space-y-4">
       <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-slate-600">
-        Admin Dashboard
+        {{ platformTitle }}
       </div>
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div class="space-y-2">
           <h1 class="text-3xl font-semibold text-slate-900">QuizMaster control center</h1>
           <p class="max-w-2xl text-sm text-slate-500">
-            Oversee quiz quality, question coverage, and category balance in one place.
+            {{ platformSubtitle }}
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">
