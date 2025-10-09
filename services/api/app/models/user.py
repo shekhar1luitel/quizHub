@@ -11,3 +11,6 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default="user")
     attempts: Mapped[List["Attempt"]] = relationship("Attempt", back_populates="user", cascade="all, delete-orphan")
+    bookmarks: Mapped[List["Bookmark"]] = relationship(
+        "Bookmark", back_populates="user", cascade="all, delete-orphan"
+    )

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useQuizStore } from '../stores/quiz'
+import { useBookmarkStore } from '../stores/bookmarks'
 
 interface QuizQuestionOption {
   id: number
@@ -29,6 +30,7 @@ const route = useRoute()
 const router = useRouter()
 const quizStore = useQuizStore()
 const authStore = useAuthStore()
+const bookmarkStore = useBookmarkStore()
 
 const quiz = ref<QuizDetail | null>(null)
 const loading = ref(true)
@@ -38,7 +40,12 @@ const submitting = ref(false)
 const submissionError = ref('')
 const timerSeconds = ref(0)
 const flagged = ref<Record<number, boolean>>({})
+const bookmarkBusy = ref<Record<number, boolean>>({})
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastVariant = ref<'success' | 'error'>('success')
 let interval: number | null = null
+let toastTimeout: number | null = null
 
 const fetchQuiz = async () => {
   loading.value = true
@@ -54,6 +61,9 @@ const fetchQuiz = async () => {
     flagged.value = {}
     quizStore.start(data.id)
     startTimer()
+    if (authStore.isAuthenticated) {
+      void bookmarkStore.ensureQuestionIdsLoaded()
+    }
   } catch (err) {
     error.value = 'Unable to load quiz. Please try again later.'
     console.error(err)
@@ -76,6 +86,28 @@ const stopTimer = () => {
     window.clearInterval(interval)
     interval = null
   }
+}
+
+const showToast = (message: string, variant: 'success' | 'error') => {
+  toastMessage.value = message
+  toastVariant.value = variant
+  toastVisible.value = true
+  if (toastTimeout) {
+    window.clearTimeout(toastTimeout)
+  }
+  toastTimeout = window.setTimeout(() => {
+    toastVisible.value = false
+    toastMessage.value = ''
+  }, 3200)
+}
+
+const hideToast = () => {
+  if (toastTimeout) {
+    window.clearTimeout(toastTimeout)
+    toastTimeout = null
+  }
+  toastVisible.value = false
+  toastMessage.value = ''
 }
 
 const questions = computed(() => quiz.value?.questions ?? [])
@@ -118,6 +150,34 @@ const toggleFlag = (questionId: number) => {
     updated[questionId] = true
   }
   flagged.value = updated
+}
+
+const isBookmarked = (questionId: number) => bookmarkStore.isBookmarked(questionId)
+
+const isBookmarkLoading = (questionId: number) => Boolean(bookmarkBusy.value[questionId])
+
+const toggleBookmark = async (questionId: number) => {
+  if (!authStore.isAuthenticated) {
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  bookmarkBusy.value = { ...bookmarkBusy.value, [questionId]: true }
+  try {
+    if (isBookmarked(questionId)) {
+      await bookmarkStore.removeBookmark(questionId)
+      showToast('Removed from bookmarks', 'success')
+    } else {
+      await bookmarkStore.addBookmark(questionId)
+      showToast('Saved to bookmarks', 'success')
+    }
+  } catch (err: any) {
+    const detail = err?.response?.data?.detail || 'Unable to update bookmark. Please try again.'
+    showToast(detail, 'error')
+  } finally {
+    const updated = { ...bookmarkBusy.value }
+    delete updated[questionId]
+    bookmarkBusy.value = updated
+  }
 }
 const navigationButtonClass = (questionId: number, index: number) => {
   const status = questionStatuses.value[questionId]
@@ -208,17 +268,97 @@ onUnmounted(() => {
   stopTimer()
   quizStore.reset()
   flagged.value = {}
+  hideToast()
 })
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) {
+      void bookmarkStore.ensureQuestionIdsLoaded(true)
+    } else {
+      bookmarkStore.reset()
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <div class="space-y-6">
+    <div
+      v-if="toastVisible"
+      class="flex items-center justify-between gap-3 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm"
+      :class="
+        toastVariant === 'success'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : 'border-red-200 bg-red-50 text-red-700'
+      "
+      role="status"
+    >
+      <span>{{ toastMessage }}</span>
+      <button
+        class="text-xs font-semibold uppercase tracking-wide text-current/70 transition hover:text-current"
+        type="button"
+        @click="hideToast"
+      >
+        Dismiss
+      </button>
+    </div>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold">{{ quiz?.title || 'Quiz' }}</h1>
         <p class="text-sm text-gray-500">Answer every question and use the navigator to review flagged items.</p>
       </div>
       <div class="flex items-center gap-3">
+        <button
+          v-if="currentQuestion"
+          class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition"
+          :class="
+            isBookmarked(currentQuestion.id)
+              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+              : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+          "
+          type="button"
+          :aria-pressed="isBookmarked(currentQuestion.id)"
+          :disabled="isBookmarkLoading(currentQuestion.id)"
+          @click="toggleBookmark(currentQuestion.id)"
+        >
+          <svg
+            v-if="!isBookmarkLoading(currentQuestion.id)"
+            class="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              v-if="isBookmarked(currentQuestion.id)"
+              d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118l-2.8-2.034c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+            />
+            <path
+              v-else
+              fill-rule="evenodd"
+              d="M10 3.22l-.97 2.988a1 1 0 01-.95.69H5.02l2.492 1.811a1 1 0 01.364 1.118l-.95 2.927L10 10.916l3.073 2.838-.95-2.927a1 1 0 01.364-1.118l2.492-1.81h-3.06a1 1 0 01-.951-.69L10 3.22z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <svg
+            v-else
+            class="h-4 w-4 animate-spin text-blue-600"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <path
+              d="M10 3.75a6.25 6.25 0 1 1-4.42 10.67"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>{{ isBookmarked(currentQuestion.id) ? 'Bookmarked' : 'Bookmark' }}</span>
+        </button>
         <button
           v-if="currentQuestion"
           class="inline-flex items-center gap-2 rounded-full border border-amber-300 px-4 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"

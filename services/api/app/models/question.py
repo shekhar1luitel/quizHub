@@ -28,6 +28,9 @@ class Question(Base):
         "QuizQuestion", back_populates="question", cascade="all, delete-orphan"
     )
     category: Mapped["Category"] = relationship("Category", back_populates="questions")
+    bookmarks: Mapped[List["Bookmark"]] = relationship(
+        "Bookmark", back_populates="question", cascade="all, delete-orphan"
+    )
 
 
 class Option(Base):

@@ -66,6 +66,10 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.setAccessToken('')
       this.setUser(null)
+      void import('./bookmarks').then(({ useBookmarkStore }) => {
+        const bookmarks = useBookmarkStore()
+        bookmarks.reset()
+      })
     },
   },
 })
