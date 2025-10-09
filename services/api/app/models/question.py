@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -10,12 +10,23 @@ from app.db.base import Base
 
 class Question(Base):
     __tablename__ = "questions"
+    __table_args__ = (
+        Index("ix_questions_subject_topic_difficulty", "subject", "topic", "difficulty"),
+        Index(
+            "ix_questions_fts",
+            text("to_tsvector('simple', coalesce(text_en,'') || ' ' || coalesce(text_ne,''))"),
+            postgresql_using="gin",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     prompt: Mapped[str] = mapped_column(Text(), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text())
     subject: Mapped[str | None] = mapped_column(String(100))
+    topic: Mapped[str | None] = mapped_column(String(100))
     difficulty: Mapped[str | None] = mapped_column(String(50))
+    text_en: Mapped[str | None] = mapped_column(Text())
+    text_ne: Mapped[str | None] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
