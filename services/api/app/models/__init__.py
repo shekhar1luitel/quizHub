@@ -13,4 +13,4 @@ from app.models.organization import (  # noqa: F401
     Organization,
     UserProfile,
 )
-from app.models.user import User  # noqa: F401
+from app.models.user import EmailVerificationToken, User  # noqa: F401

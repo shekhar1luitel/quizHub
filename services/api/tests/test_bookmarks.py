@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Dict
 
 import pytest
+
+pytest.importorskip("sqlalchemy")
+pytest.importorskip("httpx")
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
 import sys

@@ -1,5 +1,6 @@
 from collections.abc import Sequence
-from pydantic import Field
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,8 @@ class Settings(BaseSettings):
     jwt_alg: str = Field(default="HS256")
     access_token_expire_minutes: int = Field(default=30, ge=5, le=120)
     refresh_token_expire_minutes: int = Field(default=60 * 24 * 14, ge=60)
+    refresh_token_expire_days: int | None = Field(default=None, ge=1)
+    email_verification_expire_minutes: int = Field(default=15, ge=1, le=180)
 
     backend_cors_origins: str = "http://localhost:5173"
 
@@ -28,7 +31,19 @@ class Settings(BaseSettings):
     mail_from_name: str | None = None
     mail_from_email: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    @model_validator(mode="after")
+    def _apply_refresh_token_days(self) -> "Settings":
+        if self.refresh_token_expire_days is not None:
+            # prefer explicit day override when provided in env
+            self.refresh_token_expire_minutes = self.refresh_token_expire_days * 24 * 60
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

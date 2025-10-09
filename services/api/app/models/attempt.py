@@ -31,7 +31,7 @@ class Attempt(Base):
 
     quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="attempts")
     user: Mapped["User"] = relationship("User", back_populates="attempts")
-    organization: Mapped["Organization" | None] = relationship("Organization")
+    organization: Mapped["Organization | None"] = relationship("Organization")
 
     @property
     def submitted_at(self) -> datetime:

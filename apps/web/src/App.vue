@@ -80,6 +80,14 @@ const studyLinks = computed<SidebarLink[]>(() => {
       badge: 'Progress hub',
     },
     {
+      label: 'Notifications',
+      to: { name: 'notifications' },
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 8.25c0-4.556 3.694-8.25 8.25-8.25s8.25 3.694 8.25 8.25c0 3.464 1.636 5.932 2.327 6.857.36.486.071 1.143-.487 1.143H1.91c-.558 0-.847-.657-.487-1.143.69-.925 2.327-3.393 2.327-6.857Zm6 9.75a2.25 2.25 0 0 0 4.5 0" />
+      `,
+      badge: 'Updates',
+    },
+    {
       label: 'Analytics',
       to: { name: 'analytics' },
       icon: `
@@ -160,6 +168,29 @@ const adminMenuLinks = computed<SidebarLink[]>(() => {
   ]
 })
 
+const platformLinks = computed<SidebarLink[]>(() => {
+  if (!auth.isSuperuser) return []
+
+  return [
+    {
+      label: 'User management',
+      to: { name: 'admin-users' },
+      badge: 'Provision access',
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75A2.25 2.25 0 1 0 12 2.25a2.25 2.25 0 0 0 0 4.5ZM4.125 8.25a2.625 2.625 0 1 0 0 5.25 2.625 2.625 0 0 0 0-5.25Zm15.75 0a2.625 2.625 0 1 0 0 5.25 2.625 2.625 0 0 0 0-5.25ZM4.125 15.75A3.375 3.375 0 0 0 .75 19.125v.375A.75.75 0 0 0 1.5 20.25h5.25a.75.75 0 0 0 .75-.75v-.375A3.375 3.375 0 0 0 4.125 15.75Zm7.875.75a3.375 3.375 0 0 0-3.375 3.375v.375a.75.75 0 0 0 .75.75h5.25a.75.75 0 0 0 .75-.75v-.375A3.375 3.375 0 0 0 12 16.5Zm7.875-.75a3.375 3.375 0 0 0-3.375 3.375v.375a.75.75 0 0 0 .75.75h5.25a.75.75 0 0 0 .75-.75v-.375A3.375 3.375 0 0 0 19.875 15.75Z" />
+      `,
+    },
+    {
+      label: 'Mail delivery',
+      to: { name: 'admin-mail-config' },
+      badge: 'SMTP settings',
+      icon: `
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25h18V18a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18V5.25zM3 5.25l9 6 9-6" />
+      `,
+    },
+  ]
+})
+
 const navSections = computed<SidebarSection[]>(() => {
   const sections: SidebarSection[] = [
     { title: 'Explore', items: exploreLinks.value },
@@ -171,6 +202,10 @@ const navSections = computed<SidebarSection[]>(() => {
 
   if (adminMenuLinks.value.length > 0) {
     sections.push({ title: 'Admin', items: adminMenuLinks.value })
+  }
+
+  if (platformLinks.value.length > 0) {
+    sections.push({ title: 'Platform', items: platformLinks.value })
   }
 
   return sections
@@ -256,6 +291,7 @@ const headerAction = computed<HeaderAction | null>(() => {
 
 const userRoleLabel = computed(() => {
   if (!auth.isAuthenticated) return ''
+  if (auth.isSuperuser) return 'Superuser'
   return auth.isAdmin ? 'Admin' : 'Learner'
 })
 

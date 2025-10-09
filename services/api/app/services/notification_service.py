@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.organization import Notification
+from app.models.user import User
 
 
 class NotificationService:
@@ -32,6 +33,56 @@ class NotificationService:
         self.db.add(notification)
         self.db.flush()
         return notification
+
+    def create_many(
+        self,
+        user_ids: Sequence[int],
+        *,
+        type: str,
+        title: str,
+        body: str,
+        meta: dict | None = None,
+    ) -> int:
+        if not user_ids:
+            return 0
+        payload = []
+        meta_json = meta or {}
+        for user_id in user_ids:
+            payload.append(
+                Notification(
+                    user_id=user_id,
+                    type=type,
+                    title=title,
+                    body=body,
+                    meta_json=meta_json,
+                )
+            )
+        self.db.add_all(payload)
+        self.db.flush()
+        return len(payload)
+
+    def create_for_organization(
+        self,
+        organization_id: int,
+        *,
+        type: str,
+        title: str,
+        body: str,
+        meta: dict | None = None,
+    ) -> int:
+        stmt = (
+            select(User.id)
+            .where(User.organization_id == organization_id)
+            .where(User.status == "active")
+        )
+        user_ids = self.db.scalars(stmt).all()
+        return self.create_many(
+            user_ids,
+            type=type,
+            title=title,
+            body=body,
+            meta=meta,
+        )
 
     def list_for_user(
         self,

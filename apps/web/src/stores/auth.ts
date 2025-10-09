@@ -2,8 +2,12 @@ import { defineStore } from 'pinia'
 
 export interface AuthUser {
   id: number
+  username: string
   email: string
   role: string
+  status: string
+  account_type: string
+  organization_id: number | null
 }
 
 const ACCESS_TOKEN_KEY = 'lqh_access_token'
@@ -21,7 +25,8 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
-    isAdmin: (state) => state.user?.role === 'admin',
+    isAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'superuser',
+    isSuperuser: (state) => state.user?.role === 'superuser',
   },
   actions: {
     setAccessToken(token: string) {

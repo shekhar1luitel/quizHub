@@ -33,6 +33,8 @@ python -m pip install -U pip
 pip install -r requirements.txt
 # run db migrations
 alembic upgrade head
+# load sample seed data (creates demo users/quizzes)
+python -m app.db.seed
 # run API
 uvicorn app.main:app --reload --port 8000
 ```

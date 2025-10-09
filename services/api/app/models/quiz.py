@@ -33,7 +33,7 @@ class Quiz(Base):
         order_by="QuizQuestion.position",
     )
     attempts: Mapped[List["Attempt"]] = relationship("Attempt", back_populates="quiz")
-    organization: Mapped["Organization" | None] = relationship("Organization")
+    organization: Mapped["Organization | None"] = relationship("Organization")
 
 
 __all__ = ["Quiz"]

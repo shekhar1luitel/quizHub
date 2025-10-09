@@ -10,6 +10,12 @@ const routes = [
   { path: '/practice/:slug', name: 'practice', component: () => import('../pages/Practice.vue'), props: true, meta: { title: 'Practice' } },
   { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true, meta: { title: 'Quiz' } },
   {
+    path: '/notifications',
+    name: 'notifications',
+    component: () => import('../pages/Notifications.vue'),
+    meta: { requiresAuth: true, title: 'Notifications' },
+  },
+  {
     path: '/results/:id',
     name: 'results',
     component: () => import('../pages/Results.vue'),
@@ -76,6 +82,25 @@ const routes = [
     component: () => import('../pages/admin/CategoriesLibrary.vue'),
     meta: { requiresAdmin: true, title: 'Category Library' },
   },
+  {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: () => import('../pages/admin/UserManagement.vue'),
+    meta: { requiresSuperuser: true, title: 'User Management' },
+  },
+  {
+    path: '/admin/settings/mail',
+    name: 'admin-mail-config',
+    component: () => import('../pages/admin/MailConfig.vue'),
+    meta: { requiresSuperuser: true, title: 'Mail Delivery' },
+  },
+  {
+    path: '/admin/organizations/:id/members',
+    name: 'admin-organization-members',
+    component: () => import('../pages/admin/OrganizationMembers.vue'),
+    meta: { requiresAdmin: true, title: 'Organization Members' },
+    props: true,
+  },
   { path: '/login', name: 'login', component: () => import('../pages/auth/Login.vue'), meta: { title: 'Login' } },
   { path: '/register', name: 'register', component: () => import('../pages/auth/Register.vue'), meta: { title: 'Register' } },
 ]
@@ -95,6 +120,10 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return { name: 'home' }
+  }
+
+  if (to.meta.requiresSuperuser && !auth.isSuperuser) {
     return { name: 'home' }
   }
 

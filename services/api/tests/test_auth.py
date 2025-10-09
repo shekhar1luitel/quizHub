@@ -1,8 +1,10 @@
 import pytest
+
+pytest.importorskip("sqlalchemy")
+pytest.importorskip("httpx")
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.api.deps import get_db_session
@@ -33,12 +35,17 @@ client = TestClient(app)
 def test_register_and_login_flow():
     register_response = client.post(
         "/api/auth/register",
-        json={"email": "User@example.com", "password": "password123"},
+        json={
+            "username": "QuizFan",
+            "email": "User@example.com",
+            "password": "password123",
+        },
     )
     assert register_response.status_code == 201
     data = register_response.json()
     assert data["email"] == "user@example.com"
     assert data["role"] == "user"
+    assert data["account_type"] == "individual"
     assert "id" in data
 
     login_response = client.post(

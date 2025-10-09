@@ -101,7 +101,7 @@ class EnrollToken(Base):
     )
 
     organization: Mapped[Organization] = relationship("Organization", back_populates="enroll_tokens")
-    used_by: Mapped["User" | None] = relationship("User", foreign_keys=[used_by_user_id])
+    used_by: Mapped["User | None"] = relationship("User", foreign_keys=[used_by_user_id])
 
 
 class Notification(Base):

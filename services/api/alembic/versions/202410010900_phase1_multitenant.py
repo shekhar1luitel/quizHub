@@ -30,6 +30,8 @@ app_config_scope = sa.Enum("global", "org", name="app_config_scope", native_enum
 
 def upgrade() -> None:
     bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    user_columns = {col["name"]: col for col in inspector.get_columns("users")}
 
     organization_status_enum.create(bind, checkfirst=True)
     user_role_enum.create(bind, checkfirst=True)
@@ -118,7 +120,19 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
 
-    op.add_column("users", sa.Column("role", user_role_enum, nullable=False, server_default="user"))
+    if "role" not in user_columns:
+        op.add_column("users", sa.Column("role", user_role_enum, nullable=False, server_default="user"))
+    else:
+        op.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
+        op.alter_column(
+            "users",
+            "role",
+            type_=user_role_enum,
+            existing_type=user_columns["role"]["type"],
+            existing_nullable=user_columns["role"]["nullable"],
+            nullable=False,
+            server_default=sa.text("'user'"),
+        )
     op.add_column("users", sa.Column("organization_id", sa.Integer(), nullable=True))
     op.add_column("users", sa.Column("status", user_status_enum, nullable=False, server_default="active"))
     op.add_column(
@@ -177,6 +191,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    user_columns = {col["name"]: col for col in inspector.get_columns("users")}
     op.execute("DROP INDEX IF EXISTS ix_questions_fts")
     op.drop_index("ix_questions_subject_topic_difficulty", table_name="questions")
     op.drop_column("questions", "text_ne")
@@ -198,7 +215,16 @@ def downgrade() -> None:
     op.drop_column("users", "created_at")
     op.drop_column("users", "status")
     op.drop_column("users", "organization_id")
-    op.drop_column("users", "role")
+    if "role" in user_columns:
+        op.alter_column(
+            "users",
+            "role",
+            type_=sa.String(length=50),
+            existing_type=user_columns["role"]["type"],
+            existing_nullable=user_columns["role"]["nullable"],
+            nullable=False,
+            server_default=sa.text("'user'"),
+        )
 
     op.drop_table("user_profiles")
     op.drop_table("org_memberships")
