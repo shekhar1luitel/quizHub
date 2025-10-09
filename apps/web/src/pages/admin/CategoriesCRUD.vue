@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { http } from '../../api/http'
 
@@ -20,12 +21,38 @@ const success = ref('')
 const editingId = ref<number | null>(null)
 
 const totalCategories = computed(() => categories.value.length)
+const RECENT_LIMIT = 6
+const recentCategories = computed(() => categories.value.slice(0, RECENT_LIMIT))
+const hasMoreCategories = computed(() => categories.value.length > recentCategories.value.length)
 
 const form = reactive({
   name: '',
   description: '',
   icon: '',
 })
+
+const route = useRoute()
+const router = useRouter()
+const pendingEditId = ref<number | null>(null)
+
+const clearEditQuery = () => {
+  if (!('edit' in route.query)) return
+  const { edit, ...rest } = route.query
+  router.replace({
+    name: (route.name as string | undefined) ?? 'admin-categories',
+    params: route.params,
+    query: rest,
+  })
+}
+
+const applyPendingCategoryEdit = () => {
+  if (pendingEditId.value === null) return
+  const target = categories.value.find((category) => category.id === pendingEditId.value)
+  if (!target) return
+  editCategory(target)
+  pendingEditId.value = null
+  clearEditQuery()
+}
 
 const resetForm = () => {
   form.name = ''
@@ -42,6 +69,7 @@ const loadCategories = async () => {
   try {
     const { data } = await http.get<AdminCategory[]>('/categories')
     categories.value = data
+    applyPendingCategoryEdit()
   } catch (err) {
     error.value = 'Unable to load categories.'
     console.error(err)
@@ -109,6 +137,22 @@ const deleteCategory = async (id: number) => {
 }
 
 loadCategories()
+
+watch(
+  () => route.query.edit,
+  (value) => {
+    if (!value && pendingEditId.value === null) return
+    if (!value) {
+      pendingEditId.value = null
+      return
+    }
+    const id = Number(value)
+    if (Number.isNaN(id)) return
+    pendingEditId.value = id
+    applyPendingCategoryEdit()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -124,13 +168,21 @@ loadCategories()
             Create topics, assign icons, and keep descriptions up to date so learners always know what they are practicing.
           </p>
         </div>
-        <button
-          class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-          type="button"
-          @click="resetForm"
-        >
-          {{ editingId ? 'Cancel editing' : 'Reset form' }}
-        </button>
+        <div class="flex flex-wrap items-center gap-3">
+          <RouterLink
+            :to="{ name: 'admin-category-library' }"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+          >
+            View all categories
+          </RouterLink>
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+            type="button"
+            @click="resetForm"
+          >
+            {{ editingId ? 'Cancel editing' : 'Reset form' }}
+          </button>
+        </div>
       </div>
     </header>
 
@@ -215,19 +267,28 @@ loadCategories()
 
       <div class="space-y-4">
         <div class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg backdrop-blur">
-          <header class="flex items-center justify-between">
+          <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-slate-900">Existing categories</h2>
-              <p class="text-xs text-slate-500">{{ totalCategories }} total</p>
+              <h2 class="text-lg font-semibold text-slate-900">Latest categories</h2>
+              <p class="text-xs text-slate-500">
+                <span v-if="totalCategories === 0">No categories created yet.</span>
+                <span v-else>Showing {{ recentCategories.length }} of {{ totalCategories }} categories</span>
+              </p>
             </div>
-            <span v-if="loading" class="text-xs text-slate-400">Refreshing…</span>
+            <RouterLink
+              :to="{ name: 'admin-category-library' }"
+              class="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+            >
+              Open category library
+              <span aria-hidden="true">→</span>
+            </RouterLink>
           </header>
           <p v-if="loading" class="mt-6 text-sm text-slate-500">Loading categories…</p>
           <p v-else-if="error" class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{{ error }}</p>
-          <p v-else-if="categories.length === 0" class="mt-6 text-sm text-slate-500">No categories yet. Create your first topic on the left.</p>
+          <p v-else-if="recentCategories.length === 0" class="mt-6 text-sm text-slate-500">No categories yet. Create your first topic on the left.</p>
           <ul v-else class="mt-6 space-y-4 text-sm">
             <li
-              v-for="category in categories"
+              v-for="category in recentCategories"
               :key="category.id"
               class="rounded-2xl border border-slate-200 p-4 shadow-sm"
             >
@@ -261,6 +322,16 @@ loadCategories()
               </div>
             </li>
           </ul>
+          <p
+            v-if="hasMoreCategories && !loading"
+            class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
+          >
+            Showing the latest {{ recentCategories.length }} categories. Visit the
+            <RouterLink :to="{ name: 'admin-category-library' }" class="font-semibold text-brand-600 hover:text-brand-500">
+              full category library
+            </RouterLink>
+            for complete management.
+          </p>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { http } from '../../api/http'
 
@@ -80,6 +80,12 @@ const selectedQuestions = computed(() =>
 
 const totalActiveQuizzes = computed(() => quizzes.value.filter((quiz) => quiz.is_active).length)
 const totalQuestionsSelected = computed(() => form.question_ids.length)
+const RECENT_LIMIT = 5
+const recentQuizzes = computed(() => quizzes.value.slice(0, RECENT_LIMIT))
+const hasMoreQuizzes = computed(() => quizzes.value.length > recentQuizzes.value.length)
+
+const route = useRoute()
+const router = useRouter()
 
 const resetForm = () => {
   form.title = ''
@@ -205,6 +211,29 @@ const deleteQuiz = async (id: number) => {
 loadQuestions().finally(() => {
   loadQuizzes()
 })
+
+const clearEditQuery = () => {
+  if (!('edit' in route.query)) return
+  const { edit, ...rest } = route.query
+  router.replace({
+    name: (route.name as string | undefined) ?? 'admin-quizzes',
+    params: route.params,
+    query: rest,
+  })
+}
+
+watch(
+  () => route.query.edit,
+  (value) => {
+    if (!value) return
+    const id = Number(value)
+    if (Number.isNaN(id)) return
+    editQuiz(id).finally(() => {
+      clearEditQuery()
+    })
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -446,30 +475,43 @@ loadQuestions().finally(() => {
       </form>
 
       <div class="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl shadow-brand-900/5">
-        <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Published quizzes</p>
-            <h2 class="text-lg font-semibold text-slate-900">Catalogue</h2>
+            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Latest quizzes</p>
+            <h2 class="text-lg font-semibold text-slate-900">Launch-ready sets</h2>
+            <p class="text-xs text-slate-500">
+              <span v-if="quizzes.length === 0">No quizzes created yet.</span>
+              <span v-else>Showing {{ recentQuizzes.length }} of {{ quizzes.length }} quizzes</span>
+            </p>
           </div>
-          <RouterLink
-            :to="{ name: 'home', hash: '#quizzes' }"
-            class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
-          >
-            Preview section
-          </RouterLink>
+          <div class="flex flex-wrap items-center gap-2">
+            <RouterLink
+              :to="{ name: 'admin-quiz-library' }"
+              class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+            >
+              View all quizzes
+              <span aria-hidden="true">→</span>
+            </RouterLink>
+            <RouterLink
+              :to="{ name: 'home', hash: '#quizzes' }"
+              class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+            >
+              Preview section
+            </RouterLink>
+          </div>
         </header>
 
         <p v-if="quizzesLoading" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">Loading quizzes…</p>
         <p v-else-if="quizzesError" class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">{{ quizzesError }}</p>
         <p
-          v-else-if="quizzes.length === 0"
+          v-else-if="recentQuizzes.length === 0"
           class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500"
         >
           No quizzes yet. Assemble one on the left to get started.
         </p>
         <ul v-else class="space-y-3">
           <li
-            v-for="quiz in quizzes"
+            v-for="quiz in recentQuizzes"
             :key="quiz.id"
             class="rounded-2xl border border-slate-200 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg"
           >
@@ -510,6 +552,17 @@ loadQuestions().finally(() => {
             </div>
           </li>
         </ul>
+
+        <p
+          v-if="hasMoreQuizzes && !quizzesLoading"
+          class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
+        >
+          Showing the latest {{ recentQuizzes.length }} quizzes. Visit the
+          <RouterLink :to="{ name: 'admin-quiz-library' }" class="font-semibold text-brand-600 hover:text-brand-500">
+            full quiz library
+          </RouterLink>
+          to manage the entire catalogue.
+        </p>
       </div>
     </div>
   </section>

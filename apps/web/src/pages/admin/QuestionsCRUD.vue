@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { http } from '../../api/http'
 
@@ -53,16 +53,6 @@ const editingId = ref<number | null>(null)
 const categories = ref<AdminCategory[]>([])
 const categoriesLoading = ref(false)
 const categoryError = ref('')
-const searchTerm = ref('')
-
-type StatusFilter = 'all' | 'active' | 'inactive'
-
-const statusFilter = ref<StatusFilter>('all')
-const statusOptions: Array<{ label: string; value: StatusFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
-]
 
 const difficultyLevels = ['Easy', 'Medium', 'Hard'] as const
 const difficultyLevelSet = new Set<string>(difficultyLevels)
@@ -80,23 +70,12 @@ const categoryCoveragePercent = computed(() => {
   if (categories.value.length === 0) return 0
   return Math.round((usedCategoryCount.value / categories.value.length) * 100)
 })
-const filteredQuestions = computed(() => {
-  const term = searchTerm.value.trim().toLowerCase()
-  return questions.value.filter((question) => {
-    const matchesStatus =
-      statusFilter.value === 'all' ||
-      (statusFilter.value === 'active' && question.is_active) ||
-      (statusFilter.value === 'inactive' && !question.is_active)
-    const matchesSearch =
-      !term ||
-      question.prompt.toLowerCase().includes(term) ||
-      question.category_name.toLowerCase().includes(term) ||
-      question.subject?.toLowerCase().includes(term) ||
-      question.difficulty?.toLowerCase().includes(term)
-    return matchesStatus && matchesSearch
-  })
-})
-const hasActiveFilters = computed(() => statusFilter.value !== 'all' || searchTerm.value.trim().length > 0)
+const RECENT_LIMIT = 5
+const recentQuestions = computed(() => questions.value.slice(0, RECENT_LIMIT))
+const hasMoreQuestions = computed(() => totalQuestions.value > recentQuestions.value.length)
+
+const route = useRoute()
+const router = useRouter()
 
 const form = reactive({
   prompt: '',
@@ -253,14 +232,32 @@ const deleteQuestion = async (id: number) => {
   }
 }
 
-const clearFilters = () => {
-  searchTerm.value = ''
-  statusFilter.value = 'all'
-}
-
 loadCategories().finally(() => {
   loadQuestions()
 })
+
+const clearEditQuery = () => {
+  if (!('edit' in route.query)) return
+  const { edit, ...rest } = route.query
+  router.replace({
+    name: (route.name as string | undefined) ?? 'admin-questions',
+    params: route.params,
+    query: rest,
+  })
+}
+
+watch(
+  () => route.query.edit,
+  (value) => {
+    if (!value) return
+    const id = Number(value)
+    if (Number.isNaN(id)) return
+    editQuestion(id).finally(() => {
+      clearEditQuery()
+    })
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -532,78 +529,34 @@ loadCategories().finally(() => {
       </form>
 
       <div class="rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-brand-900/5 backdrop-blur md:p-7">
-        <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900">Question library</h2>
+            <h2 class="text-lg font-semibold text-slate-900">Latest questions</h2>
             <p class="text-xs text-slate-500">
-              Showing {{ filteredQuestions.length }} of {{ totalQuestions }} questions • Avg options {{ averageOptions.toFixed(1) }}
+              <span v-if="totalQuestions === 0">No questions saved yet.</span>
+              <span v-else>Showing {{ recentQuestions.length }} of {{ totalQuestions }} questions • Avg options {{ averageOptions.toFixed(1) }}</span>
             </p>
           </div>
-          <span v-if="loading" class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
-            <span class="h-2 w-2 animate-pulse rounded-full bg-brand-500"></span>
-            Syncing
-          </span>
+          <RouterLink
+            :to="{ name: 'admin-question-library' }"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+          >
+            View full library
+            <span aria-hidden="true">→</span>
+          </RouterLink>
         </header>
 
-        <div class="mt-5 space-y-4">
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div class="relative flex-1">
-              <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m13.5 13.5 3 3m-1.5-4.5A5.5 5.5 0 1 1 5 5a5.5 5.5 0 0 1 9.5 3.5Z" />
-                </svg>
-              </span>
-              <input
-                v-model="searchTerm"
-                type="search"
-                placeholder="Search question text, subject, or category…"
-                class="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
-              />
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Status</span>
-              <button
-                v-for="option in statusOptions"
-                :key="option.value"
-                class="inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold transition"
-                :class="statusFilter === option.value ? 'bg-brand-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'"
-                type="button"
-                @click="statusFilter = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-          <button
-            v-if="hasActiveFilters"
-            class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-            type="button"
-            @click="clearFilters"
-          >
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l8 8m0-8-8 8" />
-            </svg>
-            Clear filters
-          </button>
-        </div>
-
-        <div class="mt-6 space-y-4 text-sm">
+        <div class="mt-5 space-y-4 text-sm">
           <p v-if="loading" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-500">Loading question bank…</p>
           <p
-            v-else-if="questions.length === 0"
+            v-else-if="recentQuestions.length === 0"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500"
           >
             No questions yet. Start by creating your first prompt on the left.
           </p>
-          <p
-            v-else-if="filteredQuestions.length === 0"
-            class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-800"
-          >
-            Nothing matches your filters. Try adjusting the search or status.
-          </p>
           <ul v-else class="space-y-4">
             <li
-              v-for="question in filteredQuestions"
+              v-for="question in recentQuestions"
               :key="question.id"
               class="rounded-2xl border border-slate-200 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg"
             >
@@ -669,6 +622,17 @@ loadCategories().finally(() => {
             </li>
           </ul>
         </div>
+
+        <p
+          v-if="hasMoreQuestions && !loading"
+          class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
+        >
+          Viewing the latest {{ recentQuestions.length }} questions. Browse the
+          <RouterLink :to="{ name: 'admin-question-library' }" class="font-semibold text-brand-600 hover:text-brand-500">
+            complete question library
+          </RouterLink>
+          to explore every entry with filters and search.
+        </p>
       </div>
     </div>
   </section>

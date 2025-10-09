@@ -5,76 +5,44 @@ import { RouterLink } from 'vue-router'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 
-const auth = useAuthStore()
+interface HeroQuizSummary {
+  id: number
+  title: string
+  description?: string | null
+  question_count: number
+  is_active: boolean
+}
 
-const isAuthenticated = computed(() => auth.isAuthenticated)
-
-const primaryCta = computed(() =>
-  isAuthenticated.value
-    ? { label: 'Go to Dashboard', to: { name: 'dashboard' as const } }
-    : { label: 'Start Practicing', to: { name: 'register' as const } },
-)
-
-const secondaryCta = computed(() =>
-  isAuthenticated.value
-    ? { label: 'Browse Quizzes', to: { name: 'dashboard' as const } }
-    : { label: 'Login to Continue', to: { name: 'login' as const } },
-)
-
-type PracticeCategorySummary = {
+interface PracticeCategorySummary {
   slug: string
   name: string
   description?: string | null
-  icon?: string | null
   total_questions: number
   difficulty: string
 }
 
-type QuizSummary = {
-  id: number
-  title: string
-  description?: string | null
-  is_active: boolean
-  question_count: number
-}
+const auth = useAuthStore()
 
 const loading = ref(true)
-const error = ref('')
-
-const stats = ref({
-  categories: 0,
-  questions: 0,
-  quizzes: 0,
-})
-
+const error = ref<string | null>(null)
+const featuredQuizzes = ref<HeroQuizSummary[]>([])
 const topCategories = ref<PracticeCategorySummary[]>([])
-const featuredQuizzes = ref<QuizSummary[]>([])
+
+const primaryCtaLabel = computed(() => (auth.isAuthenticated ? 'Go to Dashboard' : 'Start Practicing'))
+const primaryCtaRoute = computed(() => (auth.isAuthenticated ? { name: 'dashboard' } : { name: 'register' }))
+const secondaryCtaLabel = computed(() => (auth.isAuthenticated ? 'Browse categories' : 'Login'))
+const secondaryCtaRoute = computed(() => (auth.isAuthenticated ? { name: 'categories' } : { name: 'login' }))
 
 const loadHomeData = async () => {
   loading.value = true
-  error.value = ''
+  error.value = null
   try {
-    const [categoriesResponse, quizzesResponse] = await Promise.all([
+    const [quizzesRes, categoriesRes] = await Promise.all([
+      http.get<HeroQuizSummary[]>('/quizzes'),
       http.get<PracticeCategorySummary[]>('/practice/categories'),
-      http.get<QuizSummary[]>('/quizzes'),
     ])
-
-    const categories = categoriesResponse.data
-    const quizzes = quizzesResponse.data.filter((quiz) => quiz.is_active)
-
-    stats.value = {
-      categories: categories.length,
-      questions: categories.reduce((total, item) => total + item.total_questions, 0),
-      quizzes: quizzes.length,
-    }
-
-    topCategories.value = [...categories]
-      .sort((a, b) => b.total_questions - a.total_questions)
-      .slice(0, 4)
-
-    featuredQuizzes.value = [...quizzes]
-      .sort((a, b) => b.question_count - a.question_count)
-      .slice(0, 3)
+    featuredQuizzes.value = quizzesRes.data.filter((quiz) => quiz.is_active).slice(0, 3)
+    topCategories.value = categoriesRes.data.slice(0, 4)
   } catch (err) {
     console.error(err)
     error.value = 'We could not load the latest practice data. Please try again soon.'
@@ -84,208 +52,178 @@ const loadHomeData = async () => {
 }
 
 onMounted(loadHomeData)
-
-const fallbackDescription = 'Sharpen your understanding with focused practice and clear explanations.'
 </script>
 
 <template>
-  <div class="space-y-16">
-    <section class="relative overflow-hidden rounded-4xl border border-slate-200 bg-white text-slate-900 shadow-glow">
-      <div class="absolute -right-28 top-0 h-56 w-56 rounded-full bg-brand-200/35 blur-3xl"></div>
-      <div class="absolute -left-16 bottom-0 h-52 w-52 rounded-full bg-emerald-200/30 blur-3xl"></div>
-      <div class="relative mx-auto grid max-w-6xl gap-12 px-6 py-16 md:px-10 lg:grid-cols-[3fr,2fr]">
+  <div class="space-y-12">
+    <section class="rounded-4xl border border-slate-200 bg-white/95 p-6 shadow-xl shadow-brand-900/10 sm:p-10">
+      <div class="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[3fr,2fr] lg:items-center">
         <div class="space-y-6">
-          <p class="inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-brand-600">
-            Nepal Loksewa prep
-          </p>
-          <h1 class="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
-            Master your competitive exams with confidence
-          </h1>
-          <p class="max-w-xl text-sm text-slate-600 md:text-base">
-            Access curated question banks, full-length mock tests, and personalised insights so you can focus on the topics that matter most.
-          </p>
+          <span class="inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-brand-600">
+            Lok Sewa prep made simple
+          </span>
+          <div class="space-y-4">
+            <h1 class="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl">
+              Practice Lok Sewa–style quizzes with instant feedback
+            </h1>
+            <p class="text-sm text-slate-600 sm:text-base">
+              Build confidence with curated question banks, timed mock tests, and rich explanations. Track progress on
+              your personal dashboard and tackle weak areas faster.
+            </p>
+          </div>
           <div class="flex flex-col gap-3 sm:flex-row">
             <RouterLink
-              :to="primaryCta.to"
-              class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-900/25 transition hover:bg-brand-500"
+              :to="primaryCtaRoute"
+              class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-700"
             >
-              {{ primaryCta.label }}
+              {{ primaryCtaLabel }}
               <span aria-hidden="true">→</span>
             </RouterLink>
             <RouterLink
-              :to="secondaryCta.to"
-              class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-300 hover:text-brand-600"
+              :to="secondaryCtaRoute"
+              class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
             >
-              {{ secondaryCta.label }}
+              {{ secondaryCtaLabel }}
             </RouterLink>
           </div>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <article
-              v-for="stat in [
-                { label: 'Practice categories', value: stats.categories },
-                { label: 'Active quizzes', value: stats.quizzes },
-                { label: 'Questions to explore', value: stats.questions },
-              ]"
-              :key="stat.label"
-              class="rounded-2xl border border-slate-200 bg-white/80 p-4 text-left shadow-sm backdrop-blur"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">{{ stat.label }}</p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900">{{ loading ? '…' : stat.value }}</p>
-            </article>
-          </div>
+          <dl class="grid gap-4 sm:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm">
+              <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Instant results</dt>
+              <dd class="mt-2 text-base font-semibold text-slate-900">See correct answers and explanations right away.</dd>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm">
+              <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Smart dashboard</dt>
+              <dd class="mt-2 text-base font-semibold text-slate-900">Track accuracy by subject and maintain streaks.</dd>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm">
+              <dt class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Flexible practice</dt>
+              <dd class="mt-2 text-base font-semibold text-slate-900">Filter by difficulty, bookmark questions, and retry.</dd>
+            </div>
+          </dl>
         </div>
 
-        <div class="space-y-4">
-          <div v-if="loading" class="h-64 animate-pulse rounded-3xl border border-slate-200 bg-slate-100/60"></div>
-          <div v-else-if="error" class="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div class="space-y-4 rounded-3xl border border-slate-200 bg-slate-900 p-6 text-white shadow-lg shadow-brand-900/40">
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/60">Featured quizzes</p>
+          <div v-if="loading" class="space-y-3">
+            <div v-for="n in 3" :key="n" class="h-20 animate-pulse rounded-2xl bg-white/10"></div>
+          </div>
+          <p v-else-if="error" class="rounded-2xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             {{ error }}
-          </div>
-          <div v-else class="space-y-4">
-            <article class="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
-              <h2 class="text-base font-semibold">Latest highlights</h2>
-              <p class="mt-2 text-sm text-slate-500">
-                Stay on track with fresh practice sets and quizzes sourced from the Loksewa curriculum.
+          </p>
+          <template v-else>
+            <div v-if="featuredQuizzes.length === 0" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-white/80">
+              Quizzes coming soon. Admins can activate a quiz from the Quiz Studio to showcase it here.
+            </div>
+            <article
+              v-for="quiz in featuredQuizzes"
+              :key="quiz.id"
+              class="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-white/20"
+            >
+              <p class="text-sm font-semibold">{{ quiz.title }}</p>
+              <p class="mt-2 text-xs text-white/70">
+                {{ quiz.description || 'Timed mock test with curated explanations.' }}
               </p>
-              <ul class="mt-4 space-y-2 text-sm text-slate-600">
-                <li>• {{ stats.categories }} categories curated for daily prep</li>
-                <li>• {{ stats.questions }} questions with detailed explanations</li>
-                <li>• {{ stats.quizzes }} mock tests ready to launch anytime</li>
-              </ul>
+              <div class="mt-3 flex items-center justify-between text-xs text-white/60">
+                <span>{{ quiz.question_count }} questions</span>
+                <RouterLink
+                  :to="{ name: 'quiz', params: { id: quiz.id } }"
+                  class="inline-flex items-center gap-1 text-xs font-semibold text-white transition hover:text-blue-200"
+                >
+                  Start
+                  <span aria-hidden="true">→</span>
+                </RouterLink>
+              </div>
             </article>
-            <article class="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
-              <h2 class="text-base font-semibold">Quick start</h2>
-              <ul class="mt-3 space-y-2 text-sm text-slate-600">
-                <li>
-                  <RouterLink :to="{ name: 'categories' }" class="text-brand-600 underline-offset-4 hover:underline">Browse categories</RouterLink>
-                  to target specific topics
-                </li>
-                <li>
-                  <RouterLink :to="{ name: 'dashboard' }" class="text-brand-600 underline-offset-4 hover:underline">Visit your dashboard</RouterLink>
-                  for personalised insights
-                </li>
-                <li>
-                  <RouterLink :to="{ name: 'home', hash: '#quizzes' }" class="text-brand-600 underline-offset-4 hover:underline">Launch a mock test</RouterLink>
-                  and track your progress instantly
-                </li>
-              </ul>
-            </article>
-          </div>
+          </template>
         </div>
       </div>
     </section>
 
-    <section v-if="!loading" class="space-y-10">
-      <div class="mx-auto max-w-6xl px-6">
-        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Plan your practice</p>
-            <h2 class="text-3xl font-semibold text-slate-900">Top categories right now</h2>
-            <p class="mt-2 text-sm text-slate-500">
-              Choose a subject to unlock targeted practice sessions tailored to your goals.
+    <section class="mx-auto max-w-6xl space-y-6 px-2">
+      <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Choose a focus</p>
+          <h2 class="text-2xl font-semibold text-slate-900">Top practice categories</h2>
+          <p class="text-sm text-slate-500">Dive into popular subjects or keep exploring to find your next challenge.</p>
+        </div>
+        <RouterLink
+          :to="{ name: 'categories' }"
+          class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+        >
+          View all categories
+          <span aria-hidden="true">→</span>
+        </RouterLink>
+      </header>
+
+      <div v-if="loading" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div v-for="n in 4" :key="`category-skeleton-${n}`" class="h-40 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"></div>
+      </div>
+      <div v-else-if="topCategories.length === 0" class="rounded-3xl border border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
+        Categories will appear here once they are created in the admin panel.
+      </div>
+      <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article
+          v-for="category in topCategories"
+          :key="category.slug"
+          class="flex h-full flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+        >
+          <div class="space-y-1">
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">{{ category.difficulty }}</p>
+            <h3 class="text-lg font-semibold text-slate-900">{{ category.name }}</h3>
+            <p class="text-xs text-slate-500">
+              {{ category.description || 'Sharpen your fundamentals with curated question sets.' }}
             </p>
           </div>
+          <div class="mt-auto flex items-center justify-between text-xs text-slate-500">
+            <span>{{ category.total_questions }} questions</span>
+            <RouterLink
+              :to="{ name: 'practice', params: { slug: category.slug } }"
+              class="inline-flex items-center gap-1 text-brand-600 transition hover:text-brand-500"
+            >
+              Practice
+              <span aria-hidden="true">→</span>
+            </RouterLink>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-6xl rounded-4xl border border-slate-200 bg-white/95 p-8 shadow-xl shadow-brand-900/10">
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="space-y-3">
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Why QuizMaster</p>
+          <h2 class="text-2xl font-semibold text-slate-900">Everything you need for Phase 1 prep</h2>
+          <p class="text-sm text-slate-500">
+            Carefully structured content, analytics, and admin controls make QuizMaster the central hub for Lok Sewa
+            practice.
+          </p>
+          <ul class="space-y-3 text-sm text-slate-600">
+            <li class="flex items-start gap-2">
+              <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+              Track streaks, accuracy, and category performance on a single dashboard.
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+              Admins can import questions, manage user access, and monitor platform health.
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+              Bookmark tricky questions and build targeted revision sets.
+            </li>
+          </ul>
+        </div>
+        <div class="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+          <h3 class="text-sm font-semibold text-slate-900">Upcoming features</h3>
+          <p class="text-sm text-slate-600">
+            CSV import, user management, and in-depth analytics are part of Phase 1. Payments and certification will
+            follow in later milestones.
+          </p>
           <RouterLink
-            :to="{ name: 'categories' }"
-            class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
+            :to="{ name: 'quiz-setup' }"
+            class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
           >
-            View all categories
+            Explore quiz setup
             <span aria-hidden="true">→</span>
-          </RouterLink>
-        </header>
-
-        <div v-if="topCategories.length === 0" class="mt-10 rounded-3xl border border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
-          Categories will appear here once they are created.
-        </div>
-        <div v-else class="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <article
-            v-for="category in topCategories"
-            :key="category.slug"
-            class="flex h-full flex-col gap-4 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-brand-900/5 transition hover:-translate-y-1 hover:shadow-xl"
-          >
-            <div class="space-y-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-brand-500">{{ category.difficulty }}</p>
-              <h3 class="text-xl font-semibold text-slate-900">{{ category.name }}</h3>
-            </div>
-            <p class="text-sm leading-6 text-slate-600">
-              {{ category.description?.trim() || fallbackDescription }}
-            </p>
-            <div class="mt-auto flex items-center justify-between text-sm text-slate-500">
-              <span>{{ category.total_questions }} questions</span>
-              <RouterLink
-                :to="{ name: 'practice', params: { slug: category.slug } }"
-                class="inline-flex items-center gap-1 text-brand-600 hover:underline"
-              >
-                Practice
-                <span aria-hidden="true">→</span>
-              </RouterLink>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section id="quizzes" class="rounded-4xl border border-slate-200 bg-white/90 p-8 shadow-xl shadow-brand-900/5 md:p-10">
-      <div class="mx-auto max-w-6xl space-y-10">
-        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Mock tests</p>
-            <h2 class="text-3xl font-semibold text-slate-900">Featured quizzes</h2>
-            <p class="mt-2 text-sm text-slate-500">
-              Tackle full-length practice tests designed to mirror the Loksewa experience.
-            </p>
-          </div>
-          <RouterLink
-            :to="{ name: isAuthenticated ? 'dashboard' : 'register' }"
-            class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:bg-brand-500"
-          >
-            {{ isAuthenticated ? 'Open dashboard' : 'Create free account' }}
-          </RouterLink>
-        </header>
-
-        <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <div v-for="n in 3" :key="`quiz-skeleton-${n}`" class="h-48 animate-pulse rounded-3xl bg-slate-100"></div>
-        </div>
-        <div v-else-if="featuredQuizzes.length === 0" class="rounded-3xl border border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">
-          Publish your first quiz to see it featured here.
-        </div>
-        <div v-else class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <article
-            v-for="quiz in featuredQuizzes"
-            :key="quiz.id"
-            class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-brand-900/5 transition hover:-translate-y-1 hover:shadow-xl"
-          >
-            <h3 class="text-xl font-semibold text-slate-900">{{ quiz.title }}</h3>
-            <p class="text-sm text-slate-500">{{ quiz.description || 'Challenge yourself with a timed mock test.' }}</p>
-            <div class="mt-auto flex items-center justify-between text-sm text-slate-500">
-              <span>{{ quiz.question_count }} questions</span>
-              <RouterLink :to="{ name: 'quiz', params: { id: quiz.id } }" class="inline-flex items-center gap-1 text-brand-600 hover:underline">
-                Start
-                <span aria-hidden="true">→</span>
-              </RouterLink>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="rounded-4xl border border-slate-200 bg-white/90 p-10 text-center shadow-xl shadow-brand-900/5 md:p-14">
-      <div class="mx-auto max-w-4xl space-y-4">
-        <h2 class="text-3xl font-semibold text-slate-900 md:text-4xl">Ready to accelerate your preparation?</h2>
-        <p class="text-sm text-slate-500">
-          Join thousands of aspirants who rely on QuizMaster for structured practice, real-time analytics, and exam-ready confidence.
-        </p>
-        <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <RouterLink
-            :to="primaryCta.to"
-            class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-brand-500"
-          >
-            {{ primaryCta.label }}
-          </RouterLink>
-          <RouterLink
-            :to="secondaryCta.to"
-            class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
-          >
-            {{ secondaryCta.label }}
           </RouterLink>
         </div>
       </div>
