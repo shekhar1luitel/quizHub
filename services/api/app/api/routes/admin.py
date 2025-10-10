@@ -33,12 +33,15 @@ from app.schemas.management import (
 )
 from app.schemas.bulk_import import (
     BulkCategoryPayload,
+    BulkCategoryPreview,
     BulkImportCommit,
     BulkImportPreview,
     BulkImportResult,
     BulkQuestionOption,
     BulkQuestionPayload,
+    BulkQuestionPreview,
     BulkQuizPayload,
+    BulkQuizPreview,
 )
 from app.services.config_service import ConfigService
 from app.services.email_service import EmailService
