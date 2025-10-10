@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import posixpath
+import re
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from xml.etree import ElementTree as ET
-from xml.sax.saxutils import escape
 from zipfile import BadZipFile, ZipFile
 
 
@@ -133,12 +134,17 @@ def parse_workbook(file_bytes: bytes) -> ParsedWorkbook:
 
 
 def _locate_sheet(sheet_names: Iterable[str], expected: set[str]) -> str | None:
-    normalized = {name.lower(): name for name in sheet_names}
+    normalized = {_normalize_sheet_name(name): name for name in sheet_names}
     for candidate in expected:
-        lower = candidate.lower()
-        if lower in normalized:
-            return normalized[lower]
+        candidate_key = _normalize_sheet_name(candidate)
+        if candidate_key in normalized:
+            return normalized[candidate_key]
     return None
+
+
+def _normalize_sheet_name(name: str) -> str:
+    normalized = name.strip().lower()
+    return re.sub(r"[^a-z0-9]+", "", normalized)
 
 
 def _parse_categories(rows: List[List[Any]]) -> List[ParsedCategory]:
@@ -372,6 +378,29 @@ def _is_empty_row(values: Tuple[Any, ...]) -> bool:
 
 
 def _load_sheet_map(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.utils.exceptions import InvalidFileException
+    except ImportError:
+        return _load_sheet_map_from_archive(file_bytes)
+
+    try:
+        workbook = load_workbook(BytesIO(file_bytes), data_only=True, read_only=True)
+    except (InvalidFileException, BadZipFile, KeyError, ET.ParseError, OSError) as exc:  # pragma: no cover - openpyxl raises InvalidFileException
+        raise BulkImportFormatError("Unable to read the Excel workbook. Upload a valid .xlsx file.") from exc
+
+    try:
+        sheet_map: Dict[str, List[List[Any]]] = {}
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            rows = [list(row) for row in worksheet.iter_rows(values_only=True)]
+            sheet_map[sheet_name] = rows
+        return sheet_map
+    finally:
+        workbook.close()
+
+
+def _load_sheet_map_from_archive(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
     with ZipFile(BytesIO(file_bytes)) as archive:
         workbook_xml = archive.read("xl/workbook.xml")
         workbook_tree = ET.fromstring(workbook_xml)
@@ -390,13 +419,28 @@ def _load_sheet_map(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
             target = relationships.get(rel_id)
             if not target:
                 continue
-            if not target.startswith("/"):
-                sheet_path = f"xl/{target}"
-            else:
-                sheet_path = target.lstrip("/")
+            sheet_path = _resolve_sheet_path(archive, target)
             sheet_rows = _parse_sheet(archive, sheet_path, shared_strings)
             sheets[name] = sheet_rows
         return sheets
+
+
+def _resolve_sheet_path(archive: ZipFile, target: str) -> str:
+    if target.startswith("/"):
+        candidate = target.lstrip("/")
+        if candidate in archive.namelist():
+            return candidate
+        return candidate
+
+    candidate = posixpath.normpath(posixpath.join("xl", target))
+    if candidate in archive.namelist():
+        return candidate
+
+    alt = target.lstrip("./")
+    if alt in archive.namelist():
+        return alt
+
+    return candidate
 
 
 def _parse_sheet(archive: ZipFile, sheet_path: str, shared_strings: List[str]) -> List[List[Any]]:
@@ -567,109 +611,25 @@ def build_bulk_import_workbook(
 
 
 def _write_workbook(sheets: Dict[str, List[List[Any]]]) -> bytes:
+    try:
+        from openpyxl import Workbook
+    except ImportError as exc:  # pragma: no cover - dependency should be installed in production
+        raise RuntimeError(
+            "openpyxl is required to export bulk import workbooks. "
+            "Install the 'openpyxl' package to enable downloads."
+        ) from exc
+
+    workbook = Workbook()
+    # Remove the default sheet so the ordering exactly matches the requested sheets.
+    default_sheet = workbook.active
+    workbook.remove(default_sheet)
+
+    for name, rows in sheets.items():
+        worksheet = workbook.create_sheet(title=name)
+        for row in rows:
+            worksheet.append(row)
+
     buffer = BytesIO()
-    with ZipFile(buffer, "w") as archive:
-        archive.writestr("[Content_Types].xml", _build_content_types(len(sheets)))
-        archive.writestr("_rels/.rels", _build_root_rels())
-
-        sheet_entries: List[tuple[int, str]] = []
-        for index, (name, rows) in enumerate(sheets.items(), start=1):
-            sheet_entries.append((index, name))
-            archive.writestr(f"xl/worksheets/sheet{index}.xml", _build_sheet_xml(rows))
-
-        archive.writestr("xl/workbook.xml", _build_workbook_xml(sheet_entries))
-        archive.writestr("xl/_rels/workbook.xml.rels", _build_workbook_relationships(len(sheet_entries)))
-
+    workbook.save(buffer)
     buffer.seek(0)
     return buffer.getvalue()
-
-
-def _build_sheet_xml(rows: List[List[Any]]) -> str:
-    xml_parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-        "<sheetData>",
-    ]
-    for row_index, row_values in enumerate(rows, start=1):
-        xml_parts.append(f'<row r="{row_index}">')
-        for column_index, value in enumerate(row_values, start=1):
-            if value is None or value == "":
-                continue
-            cell_ref = f"{_column_letter(column_index)}{row_index}"
-            if isinstance(value, bool):
-                xml_parts.append(f'<c r="{cell_ref}" t="b"><v>{1 if value else 0}</v></c>')
-            else:
-                xml_parts.append(
-                    f'<c r="{cell_ref}" t="inlineStr"><is><t>{escape(str(value))}</t></is></c>'
-                )
-        xml_parts.append("</row>")
-    xml_parts.append("</sheetData></worksheet>")
-    return "".join(xml_parts)
-
-
-def _build_content_types(sheet_count: int) -> str:
-    overrides = "\n".join(
-        [
-            f'  <Override PartName="/xl/worksheets/sheet{index}.xml" '
-            "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
-            for index in range(1, sheet_count + 1)
-        ]
-    )
-    overrides_block = f"\n{overrides}" if overrides else ""
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
-        "  <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
-        "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>"
-        f"{overrides_block}"
-        "</Types>"
-    )
-
-
-def _build_root_rels() -> str:
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
-        "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>"
-        "</Relationships>"
-    )
-
-
-def _build_workbook_xml(sheet_entries: List[tuple[int, str]]) -> str:
-    sheets_xml = "\n".join(
-        [
-            f'    <sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
-            for index, name in sheet_entries
-        ]
-    )
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">"
-        "  <sheets>"
-        f"{sheets_xml}"
-        "  </sheets>"
-        "</workbook>"
-    )
-
-
-def _build_workbook_relationships(sheet_count: int) -> str:
-    relationships = "\n".join(
-        [
-            f'  <Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{index}.xml"/>'
-            for index in range(1, sheet_count + 1)
-        ]
-    )
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
-        f"{relationships}"
-        "</Relationships>"
-    )
-
-
-def _column_letter(index: int) -> str:
-    letters = ""
-    while index > 0:
-        index, remainder = divmod(index - 1, 26)
-        letters = chr(65 + remainder) + letters
-    return letters
