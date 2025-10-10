@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import posixpath
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -378,6 +379,29 @@ def _is_empty_row(values: Tuple[Any, ...]) -> bool:
 
 
 def _load_sheet_map(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.utils.exceptions import InvalidFileException
+    except ImportError:
+        return _load_sheet_map_from_archive(file_bytes)
+
+    try:
+        workbook = load_workbook(BytesIO(file_bytes), data_only=True, read_only=True)
+    except (InvalidFileException, BadZipFile, KeyError, ET.ParseError, OSError) as exc:  # pragma: no cover - openpyxl raises InvalidFileException
+        raise BulkImportFormatError("Unable to read the Excel workbook. Upload a valid .xlsx file.") from exc
+
+    try:
+        sheet_map: Dict[str, List[List[Any]]] = {}
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            rows = [list(row) for row in worksheet.iter_rows(values_only=True)]
+            sheet_map[sheet_name] = rows
+        return sheet_map
+    finally:
+        workbook.close()
+
+
+def _load_sheet_map_from_archive(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
     with ZipFile(BytesIO(file_bytes)) as archive:
         workbook_xml = archive.read("xl/workbook.xml")
         workbook_tree = ET.fromstring(workbook_xml)
@@ -396,13 +420,28 @@ def _load_sheet_map(file_bytes: bytes) -> Dict[str, List[List[Any]]]:
             target = relationships.get(rel_id)
             if not target:
                 continue
-            if not target.startswith("/"):
-                sheet_path = f"xl/{target}"
-            else:
-                sheet_path = target.lstrip("/")
+            sheet_path = _resolve_sheet_path(archive, target)
             sheet_rows = _parse_sheet(archive, sheet_path, shared_strings)
             sheets[name] = sheet_rows
         return sheets
+
+
+def _resolve_sheet_path(archive: ZipFile, target: str) -> str:
+    if target.startswith("/"):
+        candidate = target.lstrip("/")
+        if candidate in archive.namelist():
+            return candidate
+        return candidate
+
+    candidate = posixpath.normpath(posixpath.join("xl", target))
+    if candidate in archive.namelist():
+        return candidate
+
+    alt = target.lstrip("./")
+    if alt in archive.namelist():
+        return alt
+
+    return candidate
 
 
 def _parse_sheet(archive: ZipFile, sheet_path: str, shared_strings: List[str]) -> List[List[Any]]:
