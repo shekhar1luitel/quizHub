@@ -3,6 +3,7 @@ from __future__ import annotations
 import posixpath
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from io import BytesIO
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from xml.etree import ElementTree as ET
