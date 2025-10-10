@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape
 from zipfile import BadZipFile, ZipFile
 
 
@@ -56,6 +57,39 @@ class ParsedWorkbook:
     quizzes: List[ParsedQuiz]
     questions: List[ParsedQuestion]
     warnings: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ExportCategory:
+    name: str
+    description: str | None
+    icon: str | None
+
+
+@dataclass
+class ExportQuiz:
+    title: str
+    description: str | None
+    is_active: bool
+    question_prompts: List[str]
+
+
+@dataclass
+class ExportQuestionOption:
+    text: str
+    is_correct: bool
+
+
+@dataclass
+class ExportQuestion:
+    prompt: str
+    explanation: str | None
+    subject: str | None
+    difficulty: str | None
+    is_active: bool
+    category_name: str
+    quiz_titles: List[str]
+    options: List[ExportQuestionOption]
 
 
 _CATEGORY_SHEET_NAMES = {"categories", "category", "category setup"}
@@ -435,3 +469,207 @@ def _column_index(cell_ref: str | None) -> int:
     for char in letters:
         index = index * 26 + (ord(char.upper()) - ord("A") + 1)
     return index
+
+
+def build_bulk_import_template() -> bytes:
+    sample_categories = [
+        ExportCategory(name="General Knowledge", description="Mixed trivia sample", icon="sparkles"),
+    ]
+    sample_quizzes = [
+        ExportQuiz(
+            title="General Quiz",
+            description="Starter quiz to demonstrate the format",
+            is_active=True,
+            question_prompts=["What is 2 + 2?"],
+        )
+    ]
+    sample_questions = [
+        ExportQuestion(
+            prompt="What is 2 + 2?",
+            explanation="Basic arithmetic question.",
+            subject="Mathematics",
+            difficulty="Easy",
+            is_active=True,
+            category_name="General Knowledge",
+            quiz_titles=["General Quiz"],
+            options=[
+                ExportQuestionOption(text="4", is_correct=True),
+                ExportQuestionOption(text="5", is_correct=False),
+                ExportQuestionOption(text="3", is_correct=False),
+                ExportQuestionOption(text="22", is_correct=False),
+            ],
+        )
+    ]
+    return build_bulk_import_workbook(sample_categories, sample_quizzes, sample_questions)
+
+
+def build_bulk_import_workbook(
+    categories: Sequence[ExportCategory],
+    quizzes: Sequence[ExportQuiz],
+    questions: Sequence[ExportQuestion],
+) -> bytes:
+    categories_rows: List[List[Any]] = [["Name", "Description", "Icon"]]
+    for category in categories:
+        categories_rows.append([
+            category.name,
+            category.description or "",
+            category.icon or "",
+        ])
+
+    quizzes_rows: List[List[Any]] = [["Title", "Description", "Is Active", "Questions"]]
+    for quiz in quizzes:
+        quizzes_rows.append([
+            quiz.title,
+            quiz.description or "",
+            quiz.is_active,
+            ", ".join(quiz.question_prompts),
+        ])
+
+    option_width = max((len(question.options) for question in questions), default=0)
+    option_width = max(option_width, 2)
+    option_headers = [f"Option {index}" for index in range(1, option_width + 1)]
+    questions_header = [
+        "Prompt",
+        "Explanation",
+        "Subject",
+        "Difficulty",
+        "Is Active",
+        "Category",
+        *option_headers,
+        "Correct Option",
+        "Quizzes",
+    ]
+
+    questions_rows: List[List[Any]] = [questions_header]
+    for question in questions:
+        row: List[Any] = [
+            question.prompt,
+            question.explanation or "",
+            question.subject or "",
+            question.difficulty or "",
+            question.is_active,
+            question.category_name,
+        ]
+        for index in range(option_width):
+            option = question.options[index] if index < len(question.options) else None
+            row.append(option.text if option else "")
+        correct_index = next((idx for idx, option in enumerate(question.options) if option.is_correct), None)
+        row.append(f"Option {correct_index + 1}" if correct_index is not None else "")
+        row.append(", ".join(question.quiz_titles))
+        questions_rows.append(row)
+
+    sheets = {
+        "Categories": categories_rows,
+        "Quizzes": quizzes_rows,
+        "Questions": questions_rows,
+    }
+    return _write_workbook(sheets)
+
+
+def _write_workbook(sheets: Dict[str, List[List[Any]]]) -> bytes:
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr("[Content_Types].xml", _build_content_types(len(sheets)))
+        archive.writestr("_rels/.rels", _build_root_rels())
+
+        sheet_entries: List[tuple[int, str]] = []
+        for index, (name, rows) in enumerate(sheets.items(), start=1):
+            sheet_entries.append((index, name))
+            archive.writestr(f"xl/worksheets/sheet{index}.xml", _build_sheet_xml(rows))
+
+        archive.writestr("xl/workbook.xml", _build_workbook_xml(sheet_entries))
+        archive.writestr("xl/_rels/workbook.xml.rels", _build_workbook_relationships(len(sheet_entries)))
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _build_sheet_xml(rows: List[List[Any]]) -> str:
+    xml_parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        "<sheetData>",
+    ]
+    for row_index, row_values in enumerate(rows, start=1):
+        xml_parts.append(f'<row r="{row_index}">')
+        for column_index, value in enumerate(row_values, start=1):
+            if value is None or value == "":
+                continue
+            cell_ref = f"{_column_letter(column_index)}{row_index}"
+            if isinstance(value, bool):
+                xml_parts.append(f'<c r="{cell_ref}" t="b"><v>{1 if value else 0}</v></c>')
+            else:
+                xml_parts.append(
+                    f'<c r="{cell_ref}" t="inlineStr"><is><t>{escape(str(value))}</t></is></c>'
+                )
+        xml_parts.append("</row>")
+    xml_parts.append("</sheetData></worksheet>")
+    return "".join(xml_parts)
+
+
+def _build_content_types(sheet_count: int) -> str:
+    overrides = "\n".join(
+        [
+            f'  <Override PartName="/xl/worksheets/sheet{index}.xml" '
+            "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
+            for index in range(1, sheet_count + 1)
+        ]
+    )
+    overrides_block = f"\n{overrides}" if overrides else ""
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+        "  <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+        "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>"
+        f"{overrides_block}"
+        "</Types>"
+    )
+
+
+def _build_root_rels() -> str:
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+        "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>"
+        "</Relationships>"
+    )
+
+
+def _build_workbook_xml(sheet_entries: List[tuple[int, str]]) -> str:
+    sheets_xml = "\n".join(
+        [
+            f'    <sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
+            for index, name in sheet_entries
+        ]
+    )
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">"
+        "  <sheets>"
+        f"{sheets_xml}"
+        "  </sheets>"
+        "</workbook>"
+    )
+
+
+def _build_workbook_relationships(sheet_count: int) -> str:
+    relationships = "\n".join(
+        [
+            f'  <Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{index}.xml"/>'
+            for index in range(1, sheet_count + 1)
+        ]
+    )
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+        f"{relationships}"
+        "</Relationships>"
+    )
+
+
+def _column_letter(index: int) -> str:
+    letters = ""
+    while index > 0:
+        index, remainder = divmod(index - 1, 26)
+        letters = chr(65 + remainder) + letters
+    return letters

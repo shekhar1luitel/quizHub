@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.models.category import Category
 from app.models.question import Option, Question, QuizQuestion
 from app.models.quiz import Quiz
+from app.services.bulk_import_service import parse_workbook
 
 try:  # pragma: no cover - allow direct execution
     from .test_admin_management import _auth_headers
@@ -131,6 +132,18 @@ def _build_workbook() -> bytes:
     return buffer.getvalue()
 
 
+def test_bulk_import_template_download():
+    headers = _auth_headers()
+    response = client.get(
+        "/api/admin/bulk-import/template",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    workbook = parse_workbook(response.content)
+    assert workbook.categories
+    assert workbook.questions
+
+
 def test_bulk_import_preview_and_commit():
     headers = _auth_headers()
     content = _build_workbook()
@@ -210,6 +223,15 @@ def test_bulk_import_preview_and_commit():
         ).scalars().all()
     finally:
         session.close()
+
+    export_response = client.get(
+        "/api/admin/bulk-import/export",
+        headers=headers,
+    )
+    assert export_response.status_code == 200
+    exported = parse_workbook(export_response.content)
+    assert any(category.name == "General Knowledge" for category in exported.categories)
+    assert any(question.prompt == "What is 2 + 2?" for question in exported.questions)
 
     assert category.description == "Mixed questions"
     assert question.explanation == "Basic math."

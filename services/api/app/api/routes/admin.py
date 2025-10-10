@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     get_db_session,
@@ -43,10 +43,21 @@ from app.schemas.bulk_import import (
 from app.services.config_service import ConfigService
 from app.services.email_service import EmailService
 from app.services.notification_service import NotificationService
-from app.services.bulk_import_service import BulkImportFormatError, parse_workbook
+from app.services.bulk_import_service import (
+    BulkImportFormatError,
+    ExportCategory,
+    ExportQuestion,
+    ExportQuestionOption,
+    ExportQuiz,
+    build_bulk_import_template,
+    build_bulk_import_workbook,
+    parse_workbook,
+)
 from app.core.strings import slugify
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 @router.get("/overview", response_model=AdminOverview)
@@ -394,6 +405,36 @@ def create_admin_notification(
     )
     db.commit()
     return AdminNotificationResult(notified_users=notified)
+
+
+@router.get("/bulk-import/template")
+def download_bulk_import_template_route(
+    _: None = Depends(require_content_manager),
+) -> Response:
+    workbook = build_bulk_import_template()
+    headers = {"Content-Disposition": 'attachment; filename="bulk-import-template.xlsx"'}
+    return Response(content=workbook, media_type=EXCEL_MEDIA_TYPE, headers=headers)
+
+
+@router.get("/bulk-import/export")
+def download_bulk_import_export(
+    organization_id: int | None = Query(default=None),
+    current_user: User = Depends(require_content_manager),
+    db: Session = Depends(get_db_session),
+) -> Response:
+    target_org_id = resolve_content_organization(
+        current_user,
+        organization_id,
+        allow_global_for_admin=True,
+    )
+
+    categories = _load_export_categories(db, target_org_id)
+    quizzes, quiz_title_map = _load_export_quizzes(db, target_org_id)
+    questions = _load_export_questions(db, target_org_id, quiz_title_map)
+
+    workbook = build_bulk_import_workbook(categories, quizzes, questions)
+    headers = {"Content-Disposition": 'attachment; filename="bulk-import-export.xlsx"'}
+    return Response(content=workbook, media_type=EXCEL_MEDIA_TYPE, headers=headers)
 
 
 @router.post("/bulk-import/preview", response_model=BulkImportPreview)
@@ -789,6 +830,108 @@ def _fetch_question_map(
     else:
         stmt = stmt.where(Question.organization_id == organization_id)
     return {question.prompt.strip().lower(): question for question in db.scalars(stmt).all()}
+
+
+def _load_export_categories(db: Session, organization_id: int | None) -> list[ExportCategory]:
+    stmt = select(Category).order_by(Category.name.asc())
+    if organization_id is None:
+        stmt = stmt.where(Category.organization_id.is_(None))
+    else:
+        stmt = stmt.where(Category.organization_id == organization_id)
+    categories = db.scalars(stmt).all()
+    return [
+        ExportCategory(
+            name=category.name.strip(),
+            description=category.description,
+            icon=category.icon,
+        )
+        for category in categories
+    ]
+
+
+def _load_export_quizzes(
+    db: Session, organization_id: int | None
+) -> tuple[list[ExportQuiz], dict[int, str]]:
+    stmt = select(Quiz).order_by(Quiz.title.asc())
+    if organization_id is None:
+        stmt = stmt.where(Quiz.organization_id.is_(None))
+    else:
+        stmt = stmt.where(Quiz.organization_id == organization_id)
+    quizzes = db.scalars(stmt).all()
+
+    quiz_ids = [quiz.id for quiz in quizzes]
+    prompt_map: dict[int, list[str]] = {quiz.id: [] for quiz in quizzes}
+    if quiz_ids:
+        rows = db.execute(
+            select(QuizQuestion.quiz_id, QuizQuestion.position, Question.prompt)
+            .join(Question, Question.id == QuizQuestion.question_id)
+            .where(QuizQuestion.quiz_id.in_(quiz_ids))
+            .order_by(QuizQuestion.quiz_id, QuizQuestion.position)
+        ).all()
+        for quiz_id, _, prompt in rows:
+            prompt_map.setdefault(quiz_id, []).append(prompt)
+
+    export_quizzes = [
+        ExportQuiz(
+            title=quiz.title,
+            description=quiz.description,
+            is_active=quiz.is_active,
+            question_prompts=prompt_map.get(quiz.id, []),
+        )
+        for quiz in quizzes
+    ]
+    return export_quizzes, {quiz.id: quiz.title for quiz in quizzes}
+
+
+def _load_export_questions(
+    db: Session,
+    organization_id: int | None,
+    quiz_title_map: dict[int, str],
+) -> list[ExportQuestion]:
+    stmt = (
+        select(Question)
+        .options(selectinload(Question.options), selectinload(Question.category))
+        .order_by(Question.prompt.asc())
+    )
+    if organization_id is None:
+        stmt = stmt.where(Question.organization_id.is_(None))
+    else:
+        stmt = stmt.where(Question.organization_id == organization_id)
+    questions = db.scalars(stmt).all()
+
+    question_ids = [question.id for question in questions]
+    quiz_assignments: dict[int, list[str]] = {question.id: [] for question in questions}
+    if question_ids and quiz_title_map:
+        rows = db.execute(
+            select(QuizQuestion.question_id, QuizQuestion.quiz_id, QuizQuestion.position)
+            .where(QuizQuestion.question_id.in_(question_ids))
+            .where(QuizQuestion.quiz_id.in_(quiz_title_map.keys()))
+            .order_by(QuizQuestion.question_id, QuizQuestion.position)
+        ).all()
+        for question_id, quiz_id, _ in rows:
+            title = quiz_title_map.get(quiz_id)
+            if title:
+                quiz_assignments.setdefault(question_id, []).append(title)
+
+    export_questions: list[ExportQuestion] = []
+    for question in questions:
+        category_name = question.category.name if question.category else ""
+        export_questions.append(
+            ExportQuestion(
+                prompt=question.prompt,
+                explanation=question.explanation,
+                subject=question.subject,
+                difficulty=question.difficulty,
+                is_active=question.is_active,
+                category_name=category_name,
+                quiz_titles=quiz_assignments.get(question.id, []),
+                options=[
+                    ExportQuestionOption(text=option.text, is_correct=option.is_correct)
+                    for option in question.options
+                ],
+            )
+        )
+    return export_questions
 
 
 def _normalize_optional(value: str | None) -> str | None:

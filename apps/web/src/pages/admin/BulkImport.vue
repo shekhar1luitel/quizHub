@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, type Ref } from 'vue'
 import { http } from '../../api/http'
 
 interface PreviewCategory {
@@ -99,6 +99,9 @@ const commitError = ref('')
 const commitSuccess = ref('')
 const result = ref<BulkImportResult | null>(null)
 const committing = ref(false)
+const downloadError = ref('')
+const downloadingTemplate = ref(false)
+const downloadingExport = ref(false)
 
 const hasPreview = computed(() => preview.value !== null)
 
@@ -128,6 +131,7 @@ const pickFile = () => {
   commitError.value = ''
   commitSuccess.value = ''
   result.value = null
+  downloadError.value = ''
   fileInput.value?.click()
 }
 
@@ -288,6 +292,32 @@ const pendingSummary = computed(() => {
 const hasData = computed(() =>
   form.categories.length + form.quizzes.length + form.questions.length > 0
 )
+
+const downloadWorkbook = async (path: string, filename: string, state: Ref<boolean>) => {
+  downloadError.value = ''
+  state.value = true
+  try {
+    const { data } = await http.get(path, { responseType: 'blob' })
+    const blobUrl = window.URL.createObjectURL(data as Blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (error: any) {
+    downloadError.value = error?.response?.data?.detail || 'Download failed. Please try again.'
+  } finally {
+    state.value = false
+  }
+}
+
+const downloadTemplate = () =>
+  downloadWorkbook('/admin/bulk-import/template', 'bulk-import-template.xlsx', downloadingTemplate)
+
+const downloadExport = () =>
+  downloadWorkbook('/admin/bulk-import/export', 'bulk-import-export.xlsx', downloadingExport)
 </script>
 
 <template>
@@ -300,278 +330,332 @@ const hasData = computed(() =>
       </p>
     </header>
 
-    <section class="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-6">
-      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div class="space-y-2">
-          <h2 class="text-lg font-semibold text-slate-900">Upload workbook</h2>
-          <p class="text-sm text-slate-500">{{ uploadHint }}</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-            @click="pickFile"
-          >
-            Choose file
-          </button>
-          <input
-            ref="fileInput"
-            type="file"
-            accept=".xlsx"
-            class="hidden"
-            @change="handleFileChange"
-          />
-        </div>
-      </div>
-      <p v-if="loading" class="mt-4 text-sm text-slate-500">Parsing workbook…</p>
-      <p v-if="uploadError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-        {{ uploadError }}
-      </p>
-      <ul v-if="formatWarnings.length > 0" class="mt-4 space-y-2 text-sm text-amber-700">
-        <li v-for="warning in formatWarnings" :key="warning" class="rounded-2xl bg-amber-50 px-4 py-2">
-          {{ warning }}
-        </li>
-      </ul>
-    </section>
+    <div class="grid gap-8 lg:grid-cols-[280px,1fr]">
+      <aside class="space-y-4">
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-lg font-semibold text-slate-900">Import tools</h2>
+          <p class="mt-2 text-sm text-slate-500">
+            Download a starter workbook or export the latest library to make bulk edits in one place.
+          </p>
+          <div class="mt-4 space-y-3">
+            <button
+              type="button"
+              class="w-full rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              :disabled="downloadingTemplate"
+              @click="downloadTemplate"
+            >
+              {{ downloadingTemplate ? 'Preparing template…' : 'Download template' }}
+            </button>
+            <button
+              type="button"
+              class="w-full rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              :disabled="downloadingExport"
+              @click="downloadExport"
+            >
+              {{ downloadingExport ? 'Collecting data…' : 'Download current data' }}
+            </button>
+          </div>
+          <p v-if="downloadError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-600">
+            {{ downloadError }}
+          </p>
+        </section>
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-lg font-semibold text-slate-900">Workbook format</h2>
+          <p class="mt-2 text-sm text-slate-500">Each sheet follows a simple column layout:</p>
+          <ul class="mt-4 space-y-3 text-xs text-slate-600">
+            <li class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-800">Categories</p>
+              <p>Name · Description · Icon</p>
+            </li>
+            <li class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-800">Quizzes</p>
+              <p>Title · Description · Is Active · Questions</p>
+            </li>
+            <li class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-800">Questions</p>
+              <p>
+                Prompt · Explanation · Subject · Difficulty · Is Active · Category · Option 1..n · Correct Option · Quizzes
+              </p>
+            </li>
+          </ul>
+        </section>
+      </aside>
 
-    <section v-if="hasPreview && preview" class="space-y-6">
-      <div class="grid gap-4 md:grid-cols-3">
-        <article
-          v-for="item in pendingSummary"
-          :key="item.label"
-          class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-        >
-          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ item.label }}</p>
-          <p class="mt-3 text-3xl font-semibold text-slate-900">{{ item.create }} new</p>
-          <p class="text-xs text-slate-500">{{ item.update }} to update</p>
-        </article>
-      </div>
-      <p v-if="hasRowErrors" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        Some rows contain validation issues. Adjust the values below or update the workbook and upload
-        again. The API will perform final validation when you publish.
-      </p>
-
-      <section class="space-y-4">
-        <header class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
-          <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
-        </header>
-        <div v-if="form.categories.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          No categories were detected in this workbook.
-        </div>
-        <div v-else class="space-y-4">
-          <article
-            v-for="(category, index) in form.categories"
-            :key="index"
-            class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                {{ preview.categories[index].action === 'create' ? 'Create' : 'Update' }} ·
-                Row {{ preview.categories[index].source_row ?? '—' }}
-              </p>
-              <p v-if="preview.categories[index].errors.length" class="text-xs text-rose-500">
-                {{ preview.categories[index].errors.join(' · ') }}
-              </p>
+      <div class="space-y-8">
+        <section class="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-6">
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="space-y-2">
+              <h2 class="text-lg font-semibold text-slate-900">Upload workbook</h2>
+              <p class="text-sm text-slate-500">{{ uploadHint }}</p>
             </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-3">
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Name</span>
-                <input v-model="category.name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Description</span>
-                <input v-model="category.description" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Icon</span>
-                <input v-model="category.icon" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="space-y-4">
-        <header class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">Quizzes</h2>
-          <p class="text-xs text-slate-500">{{ form.quizzes.length }} entries detected</p>
-        </header>
-        <div v-if="form.quizzes.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          No quizzes were detected in this workbook.
-        </div>
-        <div v-else class="space-y-4">
-          <article
-            v-for="(quiz, index) in form.quizzes"
-            :key="index"
-            class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                {{ preview.quizzes[index].action === 'create' ? 'Create' : 'Update' }} ·
-                Row {{ preview.quizzes[index].source_row ?? '—' }}
-              </p>
-              <p v-if="preview.quizzes[index].errors.length" class="text-xs text-rose-500">
-                {{ preview.quizzes[index].errors.join(' · ') }}
-              </p>
-            </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Title</span>
-                <input v-model="quiz.title" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                <input v-model="quiz.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                Active
-              </label>
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Description</span>
-                <textarea v-model="quiz.description" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-              </label>
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Question prompts (comma separated)</span>
-                <textarea v-model="quiz.questionPromptsText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-              </label>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="space-y-4">
-        <header class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">Questions</h2>
-          <p class="text-xs text-slate-500">{{ form.questions.length }} entries detected</p>
-        </header>
-        <div v-if="form.questions.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          No questions were detected in this workbook.
-        </div>
-        <div v-else class="space-y-4">
-          <article
-            v-for="(question, index) in form.questions"
-            :key="index"
-            class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                {{ preview.questions[index].action === 'create' ? 'Create' : 'Update' }} ·
-                Row {{ preview.questions[index].source_row ?? '—' }}
-              </p>
-              <p v-if="preview.questions[index].errors.length" class="text-xs text-rose-500">
-                {{ preview.questions[index].errors.join(' · ') }}
-              </p>
-            </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Prompt</span>
-                <textarea v-model="question.prompt" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-              </label>
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Explanation</span>
-                <textarea v-model="question.explanation" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-              </label>
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Subject</span>
-                <input v-model="question.subject" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Difficulty</span>
-                <input v-model="question.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                <input v-model="question.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                Active
-              </label>
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="font-medium text-slate-600">Category</span>
-                <input v-model="question.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-              </label>
-              <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
-                <textarea v-model="question.quizTitlesText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-              </label>
-            </div>
-            <div class="mt-6 space-y-3">
-              <h3 class="text-sm font-semibold text-slate-700">Answer options</h3>
-              <div
-                v-for="(option, optionIndex) in question.options"
-                :key="optionIndex"
-                class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div class="flex flex-1 flex-col gap-1 text-sm">
-                  <span class="font-medium text-slate-600">Option {{ optionIndex + 1 }}</span>
-                  <input v-model="option.text" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                </div>
-                <div class="flex items-center gap-3 text-sm">
-                  <label class="inline-flex items-center gap-2 font-medium text-slate-600">
-                    <input
-                      :name="`correct-${index}`"
-                      type="radio"
-                      :checked="option.is_correct"
-                      @change="markCorrectOption(index, optionIndex)"
-                      class="text-slate-900 focus:ring-slate-500"
-                    />
-                    Correct answer
-                  </label>
-                  <button
-                    type="button"
-                    class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                    @click="removeOption(index, optionIndex)"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
+            <div class="flex items-center gap-3">
               <button
                 type="button"
-                class="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                @click="addOption(index)"
+                class="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                @click="pickFile"
               >
-                Add option
+                Choose file
               </button>
+              <input
+                ref="fileInput"
+                type="file"
+                accept=".xlsx"
+                class="hidden"
+                @change="handleFileChange"
+              />
             </div>
-          </article>
-        </div>
-      </section>
-    </section>
-
-    <section v-if="hasData" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-slate-900">Publish changes</h2>
-          <p class="text-sm text-slate-500">
-            Review the adjustments above. When you publish, the API will create new records and update any
-            matching items.
+          </div>
+          <p v-if="loading" class="mt-4 text-sm text-slate-500">Parsing workbook…</p>
+          <p v-if="uploadError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
+            {{ uploadError }}
           </p>
-        </div>
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-          :disabled="committing"
-          @click="commitImport"
-        >
-          {{ committing ? 'Saving…' : 'Publish import' }}
-        </button>
+          <ul v-if="formatWarnings.length > 0" class="mt-4 space-y-2 text-sm text-amber-700">
+            <li v-for="warning in formatWarnings" :key="warning" class="rounded-2xl bg-amber-50 px-4 py-2">
+              {{ warning }}
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="hasPreview && preview" class="space-y-6">
+          <div class="grid gap-4 md:grid-cols-3">
+            <article
+              v-for="item in pendingSummary"
+              :key="item.label"
+              class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ item.label }}</p>
+              <p class="mt-3 text-3xl font-semibold text-slate-900">{{ item.create }} new</p>
+              <p class="text-xs text-slate-500">{{ item.update }} to update</p>
+            </article>
+          </div>
+          <p v-if="hasRowErrors" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            Some rows contain validation issues. Adjust the values below or update the workbook and upload
+            again. The API will perform final validation when you publish.
+          </p>
+
+          <section class="space-y-4">
+            <header class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
+              <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
+            </header>
+            <div v-if="form.categories.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+              No categories were detected in this workbook.
+            </div>
+            <div v-else class="space-y-4">
+              <article
+                v-for="(category, index) in form.categories"
+                :key="index"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    {{ preview.categories[index].action === 'create' ? 'Create' : 'Update' }} ·
+                    Row {{ preview.categories[index].source_row ?? '—' }}
+                  </p>
+                  <p v-if="preview.categories[index].errors.length" class="text-xs text-rose-500">
+                    {{ preview.categories[index].errors.join(' · ') }}
+                  </p>
+                </div>
+                <div class="mt-4 grid gap-4 md:grid-cols-3">
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Name</span>
+                    <input v-model="category.name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Description</span>
+                    <input v-model="category.description" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Icon</span>
+                    <input v-model="category.icon" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="space-y-4">
+            <header class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Quizzes</h2>
+              <p class="text-xs text-slate-500">{{ form.quizzes.length }} entries detected</p>
+            </header>
+            <div v-if="form.quizzes.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+              No quizzes were detected in this workbook.
+            </div>
+            <div v-else class="space-y-4">
+              <article
+                v-for="(quiz, index) in form.quizzes"
+                :key="index"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    {{ preview.quizzes[index].action === 'create' ? 'Create' : 'Update' }} ·
+                    Row {{ preview.quizzes[index].source_row ?? '—' }}
+                  </p>
+                  <p v-if="preview.quizzes[index].errors.length" class="text-xs text-rose-500">
+                    {{ preview.quizzes[index].errors.join(' · ') }}
+                  </p>
+                </div>
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Title</span>
+                    <input v-model="quiz.title" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                    <input v-model="quiz.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+                    Active
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Description</span>
+                    <textarea v-model="quiz.description" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Question prompts (comma separated)</span>
+                    <textarea v-model="quiz.questionPromptsText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                  </label>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="space-y-4">
+            <header class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Questions</h2>
+              <p class="text-xs text-slate-500">{{ form.questions.length }} entries detected</p>
+            </header>
+            <div v-if="form.questions.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+              No questions were detected in this workbook.
+            </div>
+            <div v-else class="space-y-4">
+              <article
+                v-for="(question, index) in form.questions"
+                :key="index"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    {{ preview.questions[index].action === 'create' ? 'Create' : 'Update' }} ·
+                    Row {{ preview.questions[index].source_row ?? '—' }}
+                  </p>
+                  <p v-if="preview.questions[index].errors.length" class="text-xs text-rose-500">
+                    {{ preview.questions[index].errors.join(' · ') }}
+                  </p>
+                </div>
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Prompt</span>
+                    <textarea v-model="question.prompt" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Explanation</span>
+                    <textarea v-model="question.explanation" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Subject</span>
+                    <input v-model="question.subject" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Difficulty</span>
+                    <input v-model="question.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                    <input v-model="question.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+                    Active
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm">
+                    <span class="font-medium text-slate-600">Category</span>
+                    <input v-model="question.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
+                    <textarea v-model="question.quizTitlesText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                  </label>
+                </div>
+                <div class="mt-6 space-y-3">
+                  <h3 class="text-sm font-semibold text-slate-700">Answer options</h3>
+                  <div
+                    v-for="(option, optionIndex) in question.options"
+                    :key="optionIndex"
+                    class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div class="flex flex-1 flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Option {{ optionIndex + 1 }}</span>
+                      <input v-model="option.text" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </div>
+                    <div class="flex items-center gap-3 text-sm">
+                      <label class="inline-flex items-center gap-2 font-medium text-slate-600">
+                        <input
+                          :name="`correct-${index}`"
+                          type="radio"
+                          :checked="option.is_correct"
+                          @change="markCorrectOption(index, optionIndex)"
+                          class="text-slate-900 focus:ring-slate-500"
+                        />
+                        Correct answer
+                      </label>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                        @click="removeOption(index, optionIndex)"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                    @click="addOption(index)"
+                  >
+                    Add option
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section v-if="hasData" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Publish changes</h2>
+              <p class="text-sm text-slate-500">
+                Review the adjustments above. When you publish, the API will create new records and update any
+                matching items.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              :disabled="committing"
+              @click="commitImport"
+            >
+              {{ committing ? 'Saving…' : 'Publish import' }}
+            </button>
+          </div>
+          <p v-if="commitError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
+            {{ commitError }}
+          </p>
+          <p v-if="commitSuccess" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+            {{ commitSuccess }}
+          </p>
+          <div v-if="result" class="mt-4 grid gap-3 md:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
+              <p class="font-semibold text-slate-900">Categories</p>
+              <p>{{ result.categories_created }} created · {{ result.categories_updated }} updated</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
+              <p class="font-semibold text-slate-900">Quizzes</p>
+              <p>{{ result.quizzes_created }} created · {{ result.quizzes_updated }} updated</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
+              <p class="font-semibold text-slate-900">Questions</p>
+              <p>{{ result.questions_created }} created · {{ result.questions_updated }} updated</p>
+            </div>
+          </div>
+        </section>
       </div>
-      <p v-if="commitError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-        {{ commitError }}
-      </p>
-      <p v-if="commitSuccess" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-        {{ commitSuccess }}
-      </p>
-      <div v-if="result" class="mt-4 grid gap-3 md:grid-cols-3">
-        <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <p class="font-semibold text-slate-900">Categories</p>
-          <p>{{ result.categories_created }} created · {{ result.categories_updated }} updated</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <p class="font-semibold text-slate-900">Quizzes</p>
-          <p>{{ result.quizzes_created }} created · {{ result.quizzes_updated }} updated</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <p class="font-semibold text-slate-900">Questions</p>
-          <p>{{ result.questions_created }} created · {{ result.questions_updated }} updated</p>
-        </div>
-      </div>
-    </section>
+    </div>
   </section>
 </template>
