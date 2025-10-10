@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
@@ -133,12 +134,17 @@ def parse_workbook(file_bytes: bytes) -> ParsedWorkbook:
 
 
 def _locate_sheet(sheet_names: Iterable[str], expected: set[str]) -> str | None:
-    normalized = {name.lower(): name for name in sheet_names}
+    normalized = {_normalize_sheet_name(name): name for name in sheet_names}
     for candidate in expected:
-        lower = candidate.lower()
-        if lower in normalized:
-            return normalized[lower]
+        candidate_key = _normalize_sheet_name(candidate)
+        if candidate_key in normalized:
+            return normalized[candidate_key]
     return None
+
+
+def _normalize_sheet_name(name: str) -> str:
+    normalized = name.strip().lower()
+    return re.sub(r"[^a-z0-9]+", "", normalized)
 
 
 def _parse_categories(rows: List[List[Any]]) -> List[ParsedCategory]:
