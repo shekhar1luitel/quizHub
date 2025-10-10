@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import List
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, event
+from sqlalchemy.schema import DDL
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -12,11 +13,6 @@ class Question(Base):
     __tablename__ = "questions"
     __table_args__ = (
         Index("ix_questions_subject_topic_difficulty", "subject", "topic", "difficulty"),
-        Index(
-            "ix_questions_fts",
-            text("to_tsvector('simple', coalesce(text_en,'') || ' ' || coalesce(text_ne,''))"),
-            postgresql_using="gin",
-        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -72,6 +68,14 @@ class QuizQuestion(Base):
 
     quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="questions")
     question: Mapped[Question] = relationship("Question", back_populates="quizzes")
+
+
+FTS_INDEX = DDL(
+    "CREATE INDEX IF NOT EXISTS ix_questions_fts "
+    "ON questions USING gin (to_tsvector('simple', coalesce(text_en,'') || ' ' || coalesce(text_ne,'')))"
+)
+
+event.listen(Question.__table__, "after_create", FTS_INDEX.execute_if(dialect="postgresql"))
 
 
 __all__ = ["Question", "Option", "QuizQuestion"]

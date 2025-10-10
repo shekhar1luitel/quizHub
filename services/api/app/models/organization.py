@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, func, text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, JSON, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+
+JSON_DICT = JSON().with_variant(JSONB(astext_type=String()), "postgresql")
 
 class Organization(Base):
     __tablename__ = "organizations"
@@ -132,7 +134,7 @@ class Notification(Base):
     type: Mapped[str] = mapped_column(String(64), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(String(1024), nullable=False)
-    meta_json: Mapped[dict | None] = mapped_column(JSONB(astext_type=String()), nullable=True)
+    meta_json: Mapped[dict | None] = mapped_column(JSON_DICT, nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -150,7 +152,7 @@ class EmailEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     to_email: Mapped[str] = mapped_column(String(255), nullable=False)
     template: Mapped[str] = mapped_column(String(128), nullable=False)
-    payload_json: Mapped[dict | None] = mapped_column(JSONB(astext_type=String()), nullable=True)
+    payload_json: Mapped[dict | None] = mapped_column(JSON_DICT, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum("queued", "sent", "failed", name="email_event_status", native_enum=False),
         nullable=False,
@@ -168,7 +170,7 @@ class AppConfig(Base):
     __tablename__ = "app_configs"
 
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
-    value_json: Mapped[dict | None] = mapped_column(JSONB(astext_type=String()), nullable=True)
+    value_json: Mapped[dict | None] = mapped_column(JSON_DICT, nullable=True)
     scope: Mapped[str] = mapped_column(
         Enum("global", "org", name="app_config_scope", native_enum=False),
         nullable=False,

@@ -96,6 +96,12 @@ const routes = [
     meta: { requiresAdmin: true, title: 'Quiz Library' },
   },
   {
+    path: '/admin/import',
+    name: 'admin-bulk-import',
+    component: () => import('../pages/admin/BulkImport.vue'),
+    meta: { requiresAdmin: true, title: 'Bulk Import' },
+  },
+  {
     path: '/admin/categories',
     name: 'admin-categories',
     component: () => import('../pages/admin/CategoriesCRUD.vue'),
