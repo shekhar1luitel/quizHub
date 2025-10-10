@@ -6,8 +6,7 @@ from datetime import datetime
 from io import BytesIO
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from xml.etree import ElementTree as ET
-from xml.sax.saxutils import escape
-from zipfile import BadZipFile, ZipFile, ZIP_DEFLATED
+from zipfile import BadZipFile, ZipFile
 
 
 class BulkImportFormatError(ValueError):
@@ -574,212 +573,25 @@ def build_bulk_import_workbook(
 
 
 def _write_workbook(sheets: Dict[str, List[List[Any]]]) -> bytes:
+    try:
+        from openpyxl import Workbook
+    except ImportError as exc:  # pragma: no cover - dependency should be installed in production
+        raise RuntimeError(
+            "openpyxl is required to export bulk import workbooks. "
+            "Install the 'openpyxl' package to enable downloads."
+        ) from exc
+
+    workbook = Workbook()
+    # Remove the default sheet so the ordering exactly matches the requested sheets.
+    default_sheet = workbook.active
+    workbook.remove(default_sheet)
+
+    for name, rows in sheets.items():
+        worksheet = workbook.create_sheet(title=name)
+        for row in rows:
+            worksheet.append(row)
+
     buffer = BytesIO()
-    sheet_entries: List[tuple[int, str]] = []
-    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
-        for index, (name, rows) in enumerate(sheets.items(), start=1):
-            sheet_entries.append((index, name))
-            archive.writestr(f"xl/worksheets/sheet{index}.xml", _build_sheet_xml(rows))
-
-        archive.writestr("[Content_Types].xml", _build_content_types(len(sheet_entries)))
-        archive.writestr("_rels/.rels", _build_root_rels())
-        archive.writestr("xl/workbook.xml", _build_workbook_xml(sheet_entries))
-        archive.writestr(
-            "xl/_rels/workbook.xml.rels", _build_workbook_relationships(len(sheet_entries))
-        )
-        archive.writestr("xl/styles.xml", _build_styles_xml())
-        archive.writestr("docProps/app.xml", _build_app_properties(sheet_entries))
-        archive.writestr("docProps/core.xml", _build_core_properties())
-
+    workbook.save(buffer)
     buffer.seek(0)
     return buffer.getvalue()
-
-
-def _build_sheet_xml(rows: List[List[Any]]) -> str:
-    xml_parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-        "<sheetData>",
-    ]
-    for row_index, row_values in enumerate(rows, start=1):
-        xml_parts.append(f'<row r="{row_index}">')
-        for column_index, value in enumerate(row_values, start=1):
-            if value is None or value == "":
-                continue
-            cell_ref = f"{_column_letter(column_index)}{row_index}"
-            if isinstance(value, bool):
-                xml_parts.append(f'<c r="{cell_ref}" t="b"><v>{1 if value else 0}</v></c>')
-            else:
-                xml_parts.append(
-                    f'<c r="{cell_ref}" t="inlineStr"><is><t>{escape(str(value))}</t></is></c>'
-                )
-        xml_parts.append("</row>")
-    xml_parts.append("</sheetData></worksheet>")
-    return "".join(xml_parts)
-
-
-def _build_content_types(sheet_count: int) -> str:
-    sheet_overrides = "\n".join(
-        [
-            f'  <Override PartName="/xl/worksheets/sheet{index}.xml" '
-            "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
-            for index in range(1, sheet_count + 1)
-        ]
-    )
-    overrides = [sheet_overrides] if sheet_overrides else []
-    overrides.extend(
-        [
-            "  <Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>",
-            "  <Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>",
-            "  <Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>",
-            "  <Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>",
-        ]
-    )
-    overrides_block = "\n".join(filter(None, overrides))
-    overrides_block = f"\n{overrides_block}" if overrides_block else ""
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
-        "  <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
-        "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>"
-        f"{overrides_block}"
-        "</Types>"
-    )
-
-
-def _build_root_rels() -> str:
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
-        "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>"
-        "  <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\"/>"
-        "  <Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\"/>"
-        "</Relationships>"
-    )
-
-
-def _build_workbook_xml(sheet_entries: List[tuple[int, str]]) -> str:
-    sheets_xml = "\n".join(
-        [
-            f'    <sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
-            for index, name in sheet_entries
-        ]
-    )
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">"
-        "  <sheets>"
-        f"{sheets_xml}"
-        "  </sheets>"
-        "</workbook>"
-    )
-
-
-def _build_workbook_relationships(sheet_count: int) -> str:
-    relationships: List[str] = []
-    for index in range(1, sheet_count + 1):
-        relationships.append(
-            f'  <Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{index}.xml"/>'
-        )
-    style_id = sheet_count + 1
-    relationships.append(
-        f'  <Relationship Id="rId{style_id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
-    )
-    joined = "\n".join(relationships)
-    joined = f"\n{joined}" if joined else ""
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
-        f"{joined}"
-        "</Relationships>"
-    )
-
-
-def _build_styles_xml() -> str:
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">"
-        "  <fonts count=\"1\">"
-        "    <font>"
-        "      <sz val=\"11\"/>"
-        "      <color theme=\"1\"/>"
-        "      <name val=\"Calibri\"/>"
-        "      <family val=\"2\"/>"
-        "      <scheme val=\"minor\"/>"
-        "    </font>"
-        "  </fonts>"
-        "  <fills count=\"2\">"
-        "    <fill><patternFill patternType=\"none\"/></fill>"
-        "    <fill><patternFill patternType=\"gray125\"/></fill>"
-        "  </fills>"
-        "  <borders count=\"1\">"
-        "    <border><left/><right/><top/><bottom/><diagonal/></border>"
-        "  </borders>"
-        "  <cellStyleXfs count=\"1\">"
-        "    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>"
-        "  </cellStyleXfs>"
-        "  <cellXfs count=\"1\">"
-        "    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>"
-        "  </cellXfs>"
-        "  <cellStyles count=\"1\">"
-        "    <cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>"
-        "  </cellStyles>"
-        "  <dxfs count=\"0\"/>"
-        "  <tableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium9\" defaultPivotStyle=\"PivotStyleLight16\"/>"
-        "</styleSheet>"
-    )
-
-
-def _build_app_properties(sheet_entries: Sequence[tuple[int, str]]) -> str:
-    sheet_titles = "".join(f"      <vt:lpstr>{escape(name)}</vt:lpstr>" for _, name in sheet_entries)
-    sheet_count = len(sheet_entries)
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\" "
-        "xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\">"
-        "  <Application>QuizHub</Application>"
-        "  <DocSecurity>0</DocSecurity>"
-        "  <ScaleCrop>false</ScaleCrop>"
-        "  <HeadingPairs>"
-        "    <vt:vector size=\"2\" baseType=\"variant\">"
-        "      <vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant>"
-        f"      <vt:variant><vt:i4>{sheet_count}</vt:i4></vt:variant>"
-        "    </vt:vector>"
-        "  </HeadingPairs>"
-        "  <TitlesOfParts>"
-        f"    <vt:vector size=\"{sheet_count}\" baseType=\"lpstr\">"
-        f"{sheet_titles}"
-        "    </vt:vector>"
-        "  </TitlesOfParts>"
-        "  <Company/>"
-        "  <LinksUpToDate>false</LinksUpToDate>"
-        "  <SharedDoc>false</SharedDoc>"
-        "  <HyperlinksChanged>false</HyperlinksChanged>"
-        "  <AppVersion>16.0300</AppVersion>"
-        "</Properties>"
-    )
-
-
-def _build_core_properties() -> str:
-    timestamp = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    return (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" "
-        "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
-        "xmlns:dcterms=\"http://purl.org/dc/terms/\" "
-        "xmlns:dcmitype=\"http://purl.org/dc/dcmitype/\" "
-        "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
-        "  <dc:creator>QuizHub</dc:creator>"
-        "  <cp:lastModifiedBy>QuizHub</cp:lastModifiedBy>"
-        f"  <dcterms:created xsi:type=\"dcterms:W3CDTF\">{timestamp}</dcterms:created>"
-        f"  <dcterms:modified xsi:type=\"dcterms:W3CDTF\">{timestamp}</dcterms:modified>"
-        "</cp:coreProperties>"
-    )
-
-
-def _column_letter(index: int) -> str:
-    letters = ""
-    while index > 0:
-        index, remainder = divmod(index - 1, 26)
-        letters = chr(65 + remainder) + letters
-    return letters
