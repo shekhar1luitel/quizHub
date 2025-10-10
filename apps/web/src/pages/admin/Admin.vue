@@ -87,6 +87,12 @@ const quizHealth = computed(() => {
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">
           <RouterLink
+            :to="{ name: 'admin-bulk-import' }"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+          >
+            Bulk import
+          </RouterLink>
+          <RouterLink
             :to="{ name: 'admin-categories' }"
             class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
           >
