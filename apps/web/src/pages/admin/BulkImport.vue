@@ -293,6 +293,51 @@ const hasData = computed(() =>
   form.categories.length + form.quizzes.length + form.questions.length > 0
 )
 
+const categoryEntries = computed(() =>
+  form.categories.map((category, index) => ({
+    form: category,
+    meta: preview.value?.categories[index] ?? null,
+    index,
+  }))
+)
+
+const quizEntries = computed(() =>
+  form.quizzes.map((quiz, index) => ({
+    form: quiz,
+    meta: preview.value?.quizzes[index] ?? null,
+    index,
+  }))
+)
+
+const questionEntries = computed(() =>
+  form.questions.map((question, index) => ({
+    form: question,
+    meta: preview.value?.questions[index] ?? null,
+    index,
+  }))
+)
+
+const discardCategory = (index: number) => {
+  form.categories.splice(index, 1)
+  if (preview.value) {
+    preview.value.categories.splice(index, 1)
+  }
+}
+
+const discardQuiz = (index: number) => {
+  form.quizzes.splice(index, 1)
+  if (preview.value) {
+    preview.value.quizzes.splice(index, 1)
+  }
+}
+
+const discardQuestion = (index: number) => {
+  form.questions.splice(index, 1)
+  if (preview.value) {
+    preview.value.questions.splice(index, 1)
+  }
+}
+
 const downloadWorkbook = async (path: string, filename: string, state: Ref<boolean>) => {
   downloadError.value = ''
   state.value = true
@@ -417,7 +462,7 @@ const downloadExport = () =>
         </section>
 
         <section v-if="hasPreview && preview" class="space-y-6">
-          <div class="grid gap-4 md:grid-cols-3">
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <article
               v-for="item in pendingSummary"
               :key="item.label"
@@ -433,187 +478,225 @@ const downloadExport = () =>
             again. The API will perform final validation when you publish.
           </p>
 
-          <section class="space-y-4">
-            <header class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
-              <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
-            </header>
-            <div v-if="form.categories.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-              No categories were detected in this workbook.
-            </div>
-            <div v-else class="space-y-4">
-              <article
-                v-for="(category, index) in form.categories"
-                :key="index"
-                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+          <div class="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
+            <section class="flex min-w-0 flex-col gap-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
+                <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
+              </div>
+              <div
+                v-if="form.categories.length === 0"
+                class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
               >
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                    {{ preview.categories[index].action === 'create' ? 'Create' : 'Update' }} ·
-                    Row {{ preview.categories[index].source_row ?? '—' }}
-                  </p>
-                  <p v-if="preview.categories[index].errors.length" class="text-xs text-rose-500">
-                    {{ preview.categories[index].errors.join(' · ') }}
-                  </p>
-                </div>
-                <div class="mt-4 grid gap-4 md:grid-cols-3">
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Name</span>
-                    <input v-model="category.name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Description</span>
-                    <input v-model="category.description" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Icon</span>
-                    <input v-model="category.icon" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="space-y-4">
-            <header class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Quizzes</h2>
-              <p class="text-xs text-slate-500">{{ form.quizzes.length }} entries detected</p>
-            </header>
-            <div v-if="form.quizzes.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-              No quizzes were detected in this workbook.
-            </div>
-            <div v-else class="space-y-4">
-              <article
-                v-for="(quiz, index) in form.quizzes"
-                :key="index"
-                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                    {{ preview.quizzes[index].action === 'create' ? 'Create' : 'Update' }} ·
-                    Row {{ preview.quizzes[index].source_row ?? '—' }}
-                  </p>
-                  <p v-if="preview.quizzes[index].errors.length" class="text-xs text-rose-500">
-                    {{ preview.quizzes[index].errors.join(' · ') }}
-                  </p>
-                </div>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Title</span>
-                    <input v-model="quiz.title" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                    <input v-model="quiz.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                    Active
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Description</span>
-                    <textarea v-model="quiz.description" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Question prompts (comma separated)</span>
-                    <textarea v-model="quiz.questionPromptsText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-                  </label>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="space-y-4">
-            <header class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Questions</h2>
-              <p class="text-xs text-slate-500">{{ form.questions.length }} entries detected</p>
-            </header>
-            <div v-if="form.questions.length === 0" class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-              No questions were detected in this workbook.
-            </div>
-            <div v-else class="space-y-4">
-              <article
-                v-for="(question, index) in form.questions"
-                :key="index"
-                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                    {{ preview.questions[index].action === 'create' ? 'Create' : 'Update' }} ·
-                    Row {{ preview.questions[index].source_row ?? '—' }}
-                  </p>
-                  <p v-if="preview.questions[index].errors.length" class="text-xs text-rose-500">
-                    {{ preview.questions[index].errors.join(' · ') }}
-                  </p>
-                </div>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Prompt</span>
-                    <textarea v-model="question.prompt" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Explanation</span>
-                    <textarea v-model="question.explanation" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Subject</span>
-                    <input v-model="question.subject" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Difficulty</span>
-                    <input v-model="question.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                    <input v-model="question.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                    Active
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-medium text-slate-600">Category</span>
-                    <input v-model="question.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                  </label>
-                  <label class="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
-                    <textarea v-model="question.quizTitlesText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
-                  </label>
-                </div>
-                <div class="mt-6 space-y-3">
-                  <h3 class="text-sm font-semibold text-slate-700">Answer options</h3>
-                  <div
-                    v-for="(option, optionIndex) in question.options"
-                    :key="optionIndex"
-                    class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div class="flex flex-1 flex-col gap-1 text-sm">
-                      <span class="font-medium text-slate-600">Option {{ optionIndex + 1 }}</span>
-                      <input v-model="option.text" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
-                    </div>
-                    <div class="flex items-center gap-3 text-sm">
-                      <label class="inline-flex items-center gap-2 font-medium text-slate-600">
-                        <input
-                          :name="`correct-${index}`"
-                          type="radio"
-                          :checked="option.is_correct"
-                          @change="markCorrectOption(index, optionIndex)"
-                          class="text-slate-900 focus:ring-slate-500"
-                        />
-                        Correct answer
-                      </label>
-                      <button
-                        type="button"
-                        class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                        @click="removeOption(index, optionIndex)"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
+                No categories were detected in this workbook.
+              </div>
+              <div v-else class="space-y-4">
+                <article
+                  v-for="entry in categoryEntries"
+                  :key="entry.meta?.source_row ?? `category-${entry.index}`"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                >
                   <button
                     type="button"
-                    class="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                    @click="addOption(index)"
+                    class="absolute -right-3 -top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-400 shadow-sm transition hover:border-rose-200 hover:text-rose-500"
+                    @click="discardCategory(entry.index)"
+                    aria-label="Discard category"
+                    title="Discard category"
                   >
-                    Add option
+                    <span aria-hidden="true">×</span>
                   </button>
-                </div>
-              </article>
-            </div>
-          </section>
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
+                      Row {{ entry.meta?.source_row ?? '—' }}
+                    </p>
+                    <p v-if="entry.meta?.errors?.length" class="text-xs text-rose-500">
+                      {{ entry.meta?.errors?.join(' · ') }}
+                    </p>
+                  </div>
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Name</span>
+                      <input v-model="entry.form.name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
+                      <span class="font-medium text-slate-600">Description</span>
+                      <input v-model="entry.form.description" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Icon</span>
+                      <input v-model="entry.form.icon" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="flex min-w-0 flex-col gap-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-900">Quizzes</h2>
+                <p class="text-xs text-slate-500">{{ form.quizzes.length }} entries detected</p>
+              </div>
+              <div
+                v-if="form.quizzes.length === 0"
+                class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
+              >
+                No quizzes were detected in this workbook.
+              </div>
+              <div v-else class="space-y-4">
+                <article
+                  v-for="entry in quizEntries"
+                  :key="entry.meta?.source_row ?? `quiz-${entry.index}`"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                >
+                  <button
+                    type="button"
+                    class="absolute -right-3 -top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-400 shadow-sm transition hover:border-rose-200 hover:text-rose-500"
+                    @click="discardQuiz(entry.index)"
+                    aria-label="Discard quiz"
+                    title="Discard quiz"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
+                      Row {{ entry.meta?.source_row ?? '—' }}
+                    </p>
+                    <p v-if="entry.meta?.errors?.length" class="text-xs text-rose-500">
+                      {{ entry.meta?.errors?.join(' · ') }}
+                    </p>
+                  </div>
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Title</span>
+                      <input v-model="entry.form.title" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                      <input v-model="entry.form.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+                      Active
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2">
+                      <span class="font-medium text-slate-600">Description</span>
+                      <textarea v-model="entry.form.description" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2">
+                      <span class="font-medium text-slate-600">Question prompts (comma separated)</span>
+                      <textarea v-model="entry.form.questionPromptsText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                    </label>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="flex min-w-0 flex-col gap-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-900">Questions</h2>
+                <p class="text-xs text-slate-500">{{ form.questions.length }} entries detected</p>
+              </div>
+              <div
+                v-if="form.questions.length === 0"
+                class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
+              >
+                No questions were detected in this workbook.
+              </div>
+              <div v-else class="space-y-4">
+                <article
+                  v-for="entry in questionEntries"
+                  :key="entry.meta?.source_row ?? `question-${entry.index}`"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                >
+                  <button
+                    type="button"
+                    class="absolute -right-3 -top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-400 shadow-sm transition hover:border-rose-200 hover:text-rose-500"
+                    @click="discardQuestion(entry.index)"
+                    aria-label="Discard question"
+                    title="Discard question"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
+                      Row {{ entry.meta?.source_row ?? '—' }}
+                    </p>
+                    <p v-if="entry.meta?.errors?.length" class="text-xs text-rose-500">
+                      {{ entry.meta?.errors?.join(' · ') }}
+                    </p>
+                  </div>
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
+                      <span class="font-medium text-slate-600">Prompt</span>
+                      <textarea v-model="entry.form.prompt" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                      <input v-model="entry.form.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+                      Active
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
+                      <span class="font-medium text-slate-600">Explanation</span>
+                      <textarea v-model="entry.form.explanation" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Subject</span>
+                      <input v-model="entry.form.subject" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Difficulty</span>
+                      <input v-model="entry.form.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm">
+                      <span class="font-medium text-slate-600">Category</span>
+                      <input v-model="entry.form.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
+                      <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
+                      <textarea v-model="entry.form.quizTitlesText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
+                    </label>
+                  </div>
+                  <div class="mt-6 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-700">Answer options</h3>
+                    <div
+                      v-for="(option, optionIndex) in entry.form.options"
+                      :key="optionIndex"
+                      class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                      <div class="flex flex-1 flex-col gap-1 text-sm">
+                        <span class="font-medium text-slate-600">Option {{ optionIndex + 1 }}</span>
+                        <input v-model="option.text" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                      </div>
+                      <div class="flex items-center gap-3 text-sm">
+                        <label class="inline-flex items-center gap-2 font-medium text-slate-600">
+                          <input
+                            :name="`correct-${entry.index}`"
+                            type="radio"
+                            :checked="option.is_correct"
+                            @change="markCorrectOption(entry.index, optionIndex)"
+                            class="text-slate-900 focus:ring-slate-500"
+                          />
+                          Correct answer
+                        </label>
+                        <button
+                          type="button"
+                          class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                          @click="removeOption(entry.index, optionIndex)"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                      @click="addOption(entry.index)"
+                    >
+                      Add option
+                    </button>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section v-if="hasData" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
