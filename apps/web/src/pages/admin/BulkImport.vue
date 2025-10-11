@@ -462,7 +462,7 @@ const downloadExport = () =>
         </section>
 
         <section v-if="hasPreview && preview" class="space-y-6">
-          <div class="grid gap-4 md:grid-cols-3">
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <article
               v-for="item in pendingSummary"
               :key="item.label"
@@ -478,8 +478,8 @@ const downloadExport = () =>
             again. The API will perform final validation when you publish.
           </p>
 
-          <div class="grid gap-6 xl:grid-cols-3">
-            <section class="flex flex-col gap-4">
+          <div class="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
+            <section class="flex min-w-0 flex-col gap-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
                 <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
@@ -494,7 +494,7 @@ const downloadExport = () =>
                 <article
                   v-for="entry in categoryEntries"
                   :key="entry.meta?.source_row ?? `category-${entry.index}`"
-                  class="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <button
                     type="button"
@@ -505,7 +505,7 @@ const downloadExport = () =>
                   >
                     <span aria-hidden="true">×</span>
                   </button>
-                  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
                       {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
                       Row {{ entry.meta?.source_row ?? '—' }}
@@ -514,12 +514,12 @@ const downloadExport = () =>
                       {{ entry.meta?.errors?.join(' · ') }}
                     </p>
                   </div>
-                  <div class="mt-4 grid gap-4 md:grid-cols-3">
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <label class="flex flex-col gap-1 text-sm">
                       <span class="font-medium text-slate-600">Name</span>
                       <input v-model="entry.form.name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
                       <span class="font-medium text-slate-600">Description</span>
                       <input v-model="entry.form.description" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
@@ -532,7 +532,7 @@ const downloadExport = () =>
               </div>
             </section>
 
-            <section class="flex flex-col gap-4">
+            <section class="flex min-w-0 flex-col gap-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-900">Quizzes</h2>
                 <p class="text-xs text-slate-500">{{ form.quizzes.length }} entries detected</p>
@@ -547,7 +547,7 @@ const downloadExport = () =>
                 <article
                   v-for="entry in quizEntries"
                   :key="entry.meta?.source_row ?? `quiz-${entry.index}`"
-                  class="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <button
                     type="button"
@@ -558,7 +558,7 @@ const downloadExport = () =>
                   >
                     <span aria-hidden="true">×</span>
                   </button>
-                  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
                       {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
                       Row {{ entry.meta?.source_row ?? '—' }}
@@ -567,7 +567,7 @@ const downloadExport = () =>
                       {{ entry.meta?.errors?.join(' · ') }}
                     </p>
                   </div>
-                  <div class="mt-4 grid gap-4 md:grid-cols-2">
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="flex flex-col gap-1 text-sm">
                       <span class="font-medium text-slate-600">Title</span>
                       <input v-model="entry.form.title" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
@@ -576,11 +576,11 @@ const downloadExport = () =>
                       <input v-model="entry.form.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
                       Active
                     </label>
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2">
                       <span class="font-medium text-slate-600">Description</span>
                       <textarea v-model="entry.form.description" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
                     </label>
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2">
                       <span class="font-medium text-slate-600">Question prompts (comma separated)</span>
                       <textarea v-model="entry.form.questionPromptsText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
                     </label>
@@ -589,7 +589,7 @@ const downloadExport = () =>
               </div>
             </section>
 
-            <section class="flex flex-col gap-4">
+            <section class="flex min-w-0 flex-col gap-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-900">Questions</h2>
                 <p class="text-xs text-slate-500">{{ form.questions.length }} entries detected</p>
@@ -604,7 +604,7 @@ const downloadExport = () =>
                 <article
                   v-for="entry in questionEntries"
                   :key="entry.meta?.source_row ?? `question-${entry.index}`"
-                  class="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                  class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <button
                     type="button"
@@ -615,7 +615,7 @@ const downloadExport = () =>
                   >
                     <span aria-hidden="true">×</span>
                   </button>
-                  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
                       {{ entry.meta?.action === 'create' ? 'Create' : entry.meta?.action === 'update' ? 'Update' : 'Entry' }} ·
                       Row {{ entry.meta?.source_row ?? '—' }}
@@ -624,12 +624,16 @@ const downloadExport = () =>
                       {{ entry.meta?.errors?.join(' · ') }}
                     </p>
                   </div>
-                  <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
                       <span class="font-medium text-slate-600">Prompt</span>
                       <textarea v-model="entry.form.prompt" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
                     </label>
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                      <input v-model="entry.form.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+                      Active
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
                       <span class="font-medium text-slate-600">Explanation</span>
                       <textarea v-model="entry.form.explanation" rows="3" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
                     </label>
@@ -641,15 +645,11 @@ const downloadExport = () =>
                       <span class="font-medium text-slate-600">Difficulty</span>
                       <input v-model="entry.form.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
-                    <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                      <input v-model="entry.form.is_active" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                      Active
-                    </label>
                     <label class="flex flex-col gap-1 text-sm">
                       <span class="font-medium text-slate-600">Category</span>
                       <input v-model="entry.form.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
-                    <label class="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
                       <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
                       <textarea v-model="entry.form.quizTitlesText" rows="2" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none"></textarea>
                     </label>
@@ -659,7 +659,7 @@ const downloadExport = () =>
                     <div
                       v-for="(option, optionIndex) in entry.form.options"
                       :key="optionIndex"
-                      class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
+                      class="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"
                     >
                       <div class="flex flex-1 flex-col gap-1 text-sm">
                         <span class="font-medium text-slate-600">Option {{ optionIndex + 1 }}</span>
