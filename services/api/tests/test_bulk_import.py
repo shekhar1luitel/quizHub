@@ -3,7 +3,7 @@ from zipfile import ZipFile
 from xml.sax.saxutils import escape
 from sqlalchemy import select
 
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Option, Question, QuizQuestion
 from app.models.quiz import Quiz
 from app.services.bulk_import_service import parse_workbook
@@ -47,7 +47,7 @@ def _build_workbook() -> bytes:
         xml_parts.append("</sheetData></worksheet>")
         return "".join(xml_parts)
 
-    categories_rows = [
+    subjects_rows = [
         ["Name", "Description", "Icon"],
         ["General Knowledge", "Mixed questions", "book"],
     ]
@@ -62,7 +62,7 @@ def _build_workbook() -> bytes:
             "Subject",
             "Difficulty",
             "Is Active",
-            "Category",
+            "Subject",
             "Option 1",
             "Option 2",
             "Option 3",
@@ -109,7 +109,7 @@ def _build_workbook() -> bytes:
             """<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
-    <sheet name="Categories" sheetId="1" r:id="rId1"/>
+    <sheet name="Subjects" sheetId="1" r:id="rId1"/>
     <sheet name="Quizzes" sheetId="2" r:id="rId2"/>
     <sheet name="Questions" sheetId="3" r:id="rId3"/>
   </sheets>
@@ -124,7 +124,7 @@ def _build_workbook() -> bytes:
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
 </Relationships>""",
         )
-        archive.writestr("xl/worksheets/sheet1.xml", build_sheet(categories_rows))
+        archive.writestr("xl/worksheets/sheet1.xml", build_sheet(subjects_rows))
         archive.writestr("xl/worksheets/sheet2.xml", build_sheet(quizzes_rows))
         archive.writestr("xl/worksheets/sheet3.xml", build_sheet(questions_rows))
 
@@ -140,7 +140,7 @@ def test_bulk_import_template_download():
     )
     assert response.status_code == 200
     workbook = parse_workbook(response.content)
-    assert workbook.categories
+    assert workbook.subjects
     assert workbook.questions
 
 
@@ -161,12 +161,12 @@ def test_bulk_import_preview_and_commit():
     )
     assert preview_response.status_code == 200
     preview = preview_response.json()
-    assert preview["categories"][0]["action"] == "create"
+    assert preview["subjects"][0]["action"] == "create"
     assert preview["quizzes"][0]["action"] == "create"
     assert preview["questions"][0]["action"] == "create"
 
     commit_payload = {
-        "categories": [
+        "subjects": [
             {"name": "General Knowledge", "description": "Mixed questions", "icon": "book"}
         ],
         "questions": [
@@ -176,7 +176,7 @@ def test_bulk_import_preview_and_commit():
                 "subject": "Mathematics",
                 "difficulty": "Easy",
                 "is_active": True,
-                "category_name": "General Knowledge",
+                "subject_name": "General Knowledge",
                 "quiz_titles": ["General Quiz"],
                 "options": [
                     {"text": "4", "is_correct": True},
@@ -202,14 +202,14 @@ def test_bulk_import_preview_and_commit():
     )
     assert commit_response.status_code == 200
     result = commit_response.json()
-    assert result["categories_created"] == 1
+    assert result["subjects_created"] == 1
     assert result["questions_created"] == 1
     assert result["quizzes_created"] == 1
 
     session = TestingSessionLocal()
     try:
-        category = session.execute(
-            select(Category).where(Category.slug == "general-knowledge")
+        subject = session.execute(
+            select(Subject).where(Subject.slug == "general-knowledge")
         ).scalar_one()
         question = session.execute(
             select(Question).where(Question.prompt == "What is 2 + 2?")
@@ -230,10 +230,10 @@ def test_bulk_import_preview_and_commit():
     )
     assert export_response.status_code == 200
     exported = parse_workbook(export_response.content)
-    assert any(category.name == "General Knowledge" for category in exported.categories)
+    assert any(subject.name == "General Knowledge" for subject in exported.subjects)
     assert any(question.prompt == "What is 2 + 2?" for question in exported.questions)
 
-    assert category.description == "Mixed questions"
+    assert subject.description == "Mixed questions"
     assert question.explanation == "Basic math."
     assert len(options) == 3
     assert any(option.is_correct for option in options)
@@ -253,6 +253,6 @@ def test_bulk_import_preview_and_commit():
     )
     assert repeat_preview.status_code == 200
     repeat_data = repeat_preview.json()
-    assert repeat_data["categories"][0]["action"] == "update"
+    assert repeat_data["subjects"][0]["action"] == "update"
     assert repeat_data["quizzes"][0]["action"] == "update"
     assert repeat_data["questions"][0]["action"] == "update"

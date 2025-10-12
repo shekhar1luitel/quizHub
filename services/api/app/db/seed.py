@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
 from app.models import (
-    Category,
+    Subject,
     Option,
     OrgMembership,
     Organization,
@@ -96,7 +96,7 @@ CATEGORIES = [
 QUESTIONS = [
     {
         "key": "math_addition",
-        "category": "mathematics",
+        "subject": "mathematics",
         "prompt": "What is 12 + 7?",
         "explanation": "12 + 7 equals 19.",
         "subject": "Mathematics",
@@ -111,7 +111,7 @@ QUESTIONS = [
     },
     {
         "key": "math_equation",
-        "category": "mathematics",
+        "subject": "mathematics",
         "prompt": "Solve for x: 3x + 9 = 21",
         "explanation": "Subtract 9 from both sides and divide by 3 to get x = 4.",
         "subject": "Mathematics",
@@ -126,7 +126,7 @@ QUESTIONS = [
     },
     {
         "key": "science_planet",
-        "category": "science",
+        "subject": "science",
         "prompt": "Which planet is known as the Red Planet?",
         "explanation": "Mars appears red due to iron oxide on its surface.",
         "subject": "Science",
@@ -141,7 +141,7 @@ QUESTIONS = [
     },
     {
         "key": "science_water",
-        "category": "science",
+        "subject": "science",
         "prompt": "What is the chemical formula for water?",
         "explanation": "Two hydrogen atoms and one oxygen atom form water.",
         "subject": "Science",
@@ -156,7 +156,7 @@ QUESTIONS = [
     },
     {
         "key": "gk_capital",
-        "category": "general-knowledge",
+        "subject": "general-knowledge",
         "prompt": "What is the capital city of Nepal?",
         "explanation": "Kathmandu is the capital and largest city of Nepal.",
         "subject": "General Knowledge",
@@ -171,7 +171,7 @@ QUESTIONS = [
     },
     {
         "key": "gk_language",
-        "category": "general-knowledge",
+        "subject": "general-knowledge",
         "prompt": "Which language has the most native speakers worldwide?",
         "explanation": "Mandarin Chinese has the highest number of native speakers.",
         "subject": "General Knowledge",
@@ -218,13 +218,13 @@ class Seeder:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.organizations: dict[str, Organization] = {}
-        self.categories: dict[str, Category] = {}
+        self.subjects: dict[str, Subject] = {}
         self.questions: dict[str, Question] = {}
 
     def run(self) -> None:
         logger.info("Seeding lookup tables")
         self.seed_organizations()
-        self.seed_categories()
+        self.seed_subjects()
         logger.info("Seeding users")
         self.seed_users()
         logger.info("Seeding question bank")
@@ -258,39 +258,39 @@ class Seeder:
                 organization.status = "active"
             self.organizations[slug] = organization
 
-    def seed_categories(self) -> None:
-        self._ensure_autoincrement_sequence(Category)
+    def seed_subjects(self) -> None:
+        self._ensure_autoincrement_sequence(Subject)
         for record in CATEGORIES:
             slug = slugify(record["name"])
             org_slug = record.get("organization_slug")
             organization = self.organizations.get(org_slug) if org_slug else None
-            category = self.session.execute(
-                select(Category).where(Category.slug == slug)
+            subject = self.session.execute(
+                select(Subject).where(Subject.slug == slug)
             ).scalar_one_or_none()
-            if category is None:
-                category = self.session.execute(
-                    select(Category).where(Category.name.ilike(record["name"]))
+            if subject is None:
+                subject = self.session.execute(
+                    select(Subject).where(Subject.name.ilike(record["name"]))
                 ).scalar_one_or_none()
-            if category is None:
-                category = Category(
+            if subject is None:
+                subject = Subject(
                     name=record["name"],
                     slug=slug,
                     description=record.get("description"),
                     icon=record.get("icon"),
                     organization_id=organization.id if organization else None,
                 )
-                self.session.add(category)
+                self.session.add(subject)
                 self.session.flush()
-                logger.info("Created category %s", category.slug)
+                logger.info("Created subject %s", subject.slug)
             else:
-                category.name = record["name"]
-                category.slug = slug
-                category.description = record.get("description")
-                category.icon = record.get("icon")
-                category.organization_id = organization.id if organization else None
-            self.categories[slug] = category
+                subject.name = record["name"]
+                subject.slug = slug
+                subject.description = record.get("description")
+                subject.icon = record.get("icon")
+                subject.organization_id = organization.id if organization else None
+            self.subjects[slug] = subject
 
-    def _ensure_autoincrement_sequence(self, model: type[Category]) -> None:
+    def _ensure_autoincrement_sequence(self, model: type[Subject]) -> None:
         bind = self.session.get_bind()
         if bind is None or bind.dialect.name != "postgresql":
             return
@@ -442,10 +442,10 @@ class Seeder:
 
     def seed_questions(self) -> None:
         for record in QUESTIONS:
-            category_slug = record["category"]
-            category = self.categories.get(category_slug)
-            if category is None:
-                raise ValueError(f"Category '{category_slug}' not found for question {record['key']}")
+            subject_slug = record["subject"]
+            subject = self.subjects.get(subject_slug)
+            if subject is None:
+                raise ValueError(f"Subject '{subject_slug}' not found for question {record['key']}")
 
             stmt = (
                 select(Question)
@@ -458,27 +458,27 @@ class Seeder:
                 question = Question(
                     prompt=record["prompt"],
                     explanation=record.get("explanation"),
-                    subject=record.get("subject"),
+                    subject_label=record.get("subject"),
                     topic=record.get("topic"),
                     difficulty=record.get("difficulty"),
                     text_en=record.get("prompt"),
                     text_ne=None,
-                    category_id=category.id,
+                    subject_id=subject.id,
                     is_active=True,
-                    organization_id=category.organization_id,
+                    organization_id=subject.organization_id,
                 )
                 self.session.add(question)
                 self.session.flush()
                 logger.info("Created question %s", record["key"])
             else:
                 question.explanation = record.get("explanation")
-                question.subject = record.get("subject")
+                question.subject_label = record.get("subject")
                 question.topic = record.get("topic")
                 question.difficulty = record.get("difficulty")
                 question.text_en = record.get("prompt")
-                question.category_id = category.id
+                question.subject_id = subject.id
                 question.is_active = True
-                question.organization_id = category.organization_id
+                question.organization_id = subject.organization_id
 
             existing_options = {option.text: option for option in question.options}
             for option_spec in record["options"]:
@@ -561,10 +561,10 @@ def validate_specifications() -> None:
     if duplicate_keys:
         raise ValueError(f"Duplicate question keys detected: {duplicate_keys}")
 
-    category_slugs = {slugify(category["name"]) for category in CATEGORIES}
-    missing_categories = sorted({question["category"] for question in QUESTIONS} - category_slugs)
-    if missing_categories:
-        raise ValueError(f"Questions reference unknown categories: {missing_categories}")
+    subject_slugs = {slugify(subject["name"]) for subject in CATEGORIES}
+    missing_subjects = sorted({question["subject"] for question in QUESTIONS} - subject_slugs)
+    if missing_subjects:
+        raise ValueError(f"Questions reference unknown subjects: {missing_subjects}")
 
     known_question_keys = {question["key"] for question in QUESTIONS}
     for spec in QUIZZES:

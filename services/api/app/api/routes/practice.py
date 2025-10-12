@@ -3,19 +3,20 @@ from __future__ import annotations
 from typing import Annotated, Dict, List, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.params import Query as QueryParam
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db_session, require_learner
 from app.core.difficulty import difficulty_label, normalized_difficulty
 from app.models.bookmark import Bookmark
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Question, QuizQuestion
 from app.models.quiz import Quiz
 from app.models.user import User
 from app.schemas.practice import (
-    PracticeCategoryDetail,
-    PracticeCategorySummary,
+    PracticeSubjectDetail,
+    PracticeSubjectSummary,
     PracticeQuestion,
     PracticeQuestionOption,
 )
@@ -32,27 +33,27 @@ def _resolve_practice_org_id(user: User) -> int | None:
     return None
 
 
-@router.get("/categories", response_model=List[PracticeCategorySummary])
-def list_practice_categories(
+@router.get("/subjects", response_model=List[PracticeSubjectSummary])
+def list_practice_subjects(
     current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
-) -> List[PracticeCategorySummary]:
+) -> List[PracticeSubjectSummary]:
     org_id = _resolve_practice_org_id(current_user)
 
-    categories = list(
+    subjects = list(
         db.scalars(
-            select(Category)
+            select(Subject)
             .where(
-                Category.organization_id == org_id
+                Subject.organization_id == org_id
                 if org_id is not None
-                else Category.organization_id.is_(None)
+                else Subject.organization_id.is_(None)
             )
-            .order_by(Category.name.asc())
+            .order_by(Subject.name.asc())
         )
     )
 
     question_rows = db.execute(
-        select(Question.category_id, Question.difficulty)
+        select(Question.subject_id, Question.difficulty)
         .where(Question.is_active.is_(True))
         .where(
             Question.organization_id == org_id
@@ -66,7 +67,7 @@ def list_practice_categories(
 
     quiz_rows = db.execute(
         select(
-            Question.category_id.label("category_id"),
+            Question.subject_id.label("subject_id"),
             Quiz.id.label("quiz_id"),
             func.count(QuizQuestion.question_id).label("question_count"),
         )
@@ -84,83 +85,83 @@ def list_practice_categories(
             if org_id is not None
             else Quiz.organization_id.is_(None)
         )
-        .group_by(Question.category_id, Quiz.id)
+        .group_by(Question.subject_id, Quiz.id)
     ).all()
 
     quiz_map: Dict[int, int] = {}
     quiz_counts: Dict[int, int] = {}
 
     for row in quiz_rows:
-        category_id = row.category_id
+        subject_id = row.subject_id
         question_count = int(row.question_count or 0)
-        if category_id is None or question_count == 0:
+        if subject_id is None or question_count == 0:
             continue
-        existing_count = quiz_counts.get(category_id, -1)
+        existing_count = quiz_counts.get(subject_id, -1)
         if question_count > existing_count:
-            quiz_counts[category_id] = question_count
-            quiz_map[category_id] = row.quiz_id
+            quiz_counts[subject_id] = question_count
+            quiz_map[subject_id] = row.quiz_id
 
-    for category_id, difficulty in question_rows:
-        if category_id is None:
+    for subject_id, difficulty in question_rows:
+        if subject_id is None:
             continue
-        totals[category_id] = totals.get(category_id, 0) + 1
+        totals[subject_id] = totals.get(subject_id, 0) + 1
         normalized = normalized_difficulty(difficulty)
         if normalized:
-            difficulties_map.setdefault(category_id, set()).add(normalized)
+            difficulties_map.setdefault(subject_id, set()).add(normalized)
 
-    summaries: List[PracticeCategorySummary] = []
-    for category in categories:
-        difficulties = sorted(difficulties_map.get(category.id, set()))
+    summaries: List[PracticeSubjectSummary] = []
+    for subject in subjects:
+        difficulties = sorted(difficulties_map.get(subject.id, set()))
         summaries.append(
-            PracticeCategorySummary(
-                slug=category.slug,
-                name=category.name,
-                description=category.description,
-                icon=category.icon,
-                total_questions=totals.get(category.id, 0),
+            PracticeSubjectSummary(
+                slug=subject.slug,
+                name=subject.name,
+                description=subject.description,
+                icon=subject.icon,
+                total_questions=totals.get(subject.id, 0),
                 difficulty=difficulty_label(difficulties),
                 difficulties=difficulties,
-                quiz_id=quiz_map.get(category.id),
-                organization_id=category.organization_id,
+                quiz_id=quiz_map.get(subject.id),
+                organization_id=subject.organization_id,
             )
         )
 
     return summaries
 
 
-@router.get("/categories/{slug}", response_model=PracticeCategoryDetail)
-def get_practice_category(
+@router.get("/subjects/{slug}", response_model=PracticeSubjectDetail)
+def get_practice_subject(
     slug: str,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
-) -> PracticeCategoryDetail:
+) -> PracticeSubjectDetail:
     org_id = _resolve_practice_org_id(current_user)
 
-    category = db.scalar(
-        select(Category)
-        .where(Category.slug == slug)
+    subject = db.scalar(
+        select(Subject)
+        .where(Subject.slug == slug)
         .where(
-            Category.organization_id == org_id
+            Subject.organization_id == org_id
             if org_id is not None
-            else Category.organization_id.is_(None)
+            else Subject.organization_id.is_(None)
         )
     )
-    if category is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if subject is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     stmt = (
         select(Question)
         .options(selectinload(Question.options))
         .where(Question.is_active.is_(True))
-        .where(Question.category_id == category.id)
+        .where(Question.subject_id == subject.id)
         .order_by(Question.id.desc())
         .limit(limit)
     )
-    if category.organization_id is None:
+    if subject.organization_id is None:
         stmt = stmt.where(Question.organization_id.is_(None))
     else:
-        stmt = stmt.where(Question.organization_id == category.organization_id)
+        stmt = stmt.where(Question.organization_id == subject.organization_id)
 
     questions = list(db.scalars(stmt))
 
@@ -188,38 +189,43 @@ def get_practice_category(
         for normalized in [normalized_difficulty(question.difficulty)]
         if normalized
     ]
-    return PracticeCategoryDetail(
-        slug=category.slug,
-        name=category.name,
-        description=category.description,
-        icon=category.icon,
+    return PracticeSubjectDetail(
+        slug=subject.slug,
+        name=subject.name,
+        description=subject.description,
+        icon=subject.icon,
         total_questions=len(questions),
         difficulty=difficulty_label(difficulties),
         questions=questions_payload,
-        organization_id=category.organization_id,
+        organization_id=subject.organization_id,
     )
 
 
-@router.get("/bookmarks", response_model=PracticeCategoryDetail)
+@router.get("/bookmarks", response_model=PracticeSubjectDetail)
 def get_bookmark_revision_set(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     difficulty: str | None = Query(default=None, min_length=1, max_length=50),
-    category_id: int | None = Query(default=None, ge=1),
+    subject_id: int | None = Query(default=None, ge=1),
     current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
-) -> PracticeCategoryDetail:
+) -> PracticeSubjectDetail:
     stmt = (
         select(Question)
         .join(Bookmark, Bookmark.question_id == Question.id)
-        .options(selectinload(Question.options), selectinload(Question.category))
+        .options(selectinload(Question.options), selectinload(Question.subject))
         .where(Bookmark.user_id == current_user.id)
         .where(Question.is_active.is_(True))
         .order_by(Bookmark.created_at.desc())
     )
 
-    if category_id is not None:
-        stmt = stmt.where(Question.category_id == category_id)
-    if difficulty:
+    if isinstance(subject_id, QueryParam):
+        subject_id = subject_id.default
+    if isinstance(difficulty, QueryParam):
+        difficulty = difficulty.default
+
+    if subject_id is not None:
+        stmt = stmt.where(Question.subject_id == subject_id)
+    if isinstance(difficulty, str) and difficulty:
         normalized_diff = difficulty.strip().lower()
         if normalized_diff:
             stmt = stmt.where(func.lower(Question.difficulty) == normalized_diff)
@@ -251,7 +257,7 @@ def get_bookmark_revision_set(
         if normalized
     ]
 
-    return PracticeCategoryDetail(
+    return PracticeSubjectDetail(
         slug="bookmarks",
         name="Bookmarks revision",
         description="Revisit questions you have saved for a targeted study session.",

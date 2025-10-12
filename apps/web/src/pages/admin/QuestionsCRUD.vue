@@ -7,12 +7,12 @@ import { http } from '../../api/http'
 interface QuestionSummary {
   id: number
   prompt: string
-  subject?: string | null
+  subject_label?: string | null
   difficulty?: string | null
   is_active: boolean
   option_count: number
-  category_id: number
-  category_name: string
+  subject_id: number
+  subject_name: string
 }
 
 interface QuestionFormOption {
@@ -25,19 +25,19 @@ interface QuestionDetail {
   id: number
   prompt: string
   explanation?: string | null
-  subject?: string | null
+  subject_label?: string | null
   difficulty?: string | null
   is_active: boolean
   options: QuestionFormOption[]
-  category_id: number
-  category: {
+  subject_id: number
+  subject: {
     id: number
     name: string
     slug: string
   }
 }
 
-interface AdminCategory {
+interface AdminSubject {
   id: number
   name: string
   slug: string
@@ -50,9 +50,9 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const editingId = ref<number | null>(null)
-const categories = ref<AdminCategory[]>([])
-const categoriesLoading = ref(false)
-const categoryError = ref('')
+const subjects = ref<AdminSubject[]>([])
+const subjectsLoading = ref(false)
+const subjectError = ref('')
 
 const difficultyLevels = ['Easy', 'Medium', 'Hard'] as const
 const difficultyLevelSet = new Set<string>(difficultyLevels)
@@ -65,10 +65,10 @@ const averageOptions = computed(() => {
   const totalOptions = questions.value.reduce((acc, question) => acc + question.option_count, 0)
   return Math.round((totalOptions / questions.value.length) * 10) / 10
 })
-const usedCategoryCount = computed(() => new Set(questions.value.map((question) => question.category_id)).size)
-const categoryCoveragePercent = computed(() => {
-  if (categories.value.length === 0) return 0
-  return Math.round((usedCategoryCount.value / categories.value.length) * 100)
+const usedSubjectCount = computed(() => new Set(questions.value.map((question) => question.subject_id)).size)
+const subjectCoveragePercent = computed(() => {
+  if (subjects.value.length === 0) return 0
+  return Math.round((usedSubjectCount.value / subjects.value.length) * 100)
 })
 const RECENT_LIMIT = 5
 const recentQuestions = computed(() => questions.value.slice(0, RECENT_LIMIT))
@@ -80,27 +80,27 @@ const router = useRouter()
 const form = reactive({
   prompt: '',
   explanation: '',
-  subject: '',
+  subject_label: '',
   difficulty: '',
   is_active: true,
   options: [
     { text: '', is_correct: false },
     { text: '', is_correct: false },
   ] as QuestionFormOption[],
-  category_id: null as number | null,
+  subject_id: null as number | null,
 })
 
 const resetForm = () => {
   form.prompt = ''
   form.explanation = ''
-  form.subject = ''
+  form.subject_label = ''
   form.difficulty = ''
   form.is_active = true
   form.options = [
     { text: '', is_correct: false },
     { text: '', is_correct: false },
   ]
-  form.category_id = categories.value[0]?.id ?? null
+  form.subject_id = subjects.value[0]?.id ?? null
   editingId.value = null
   success.value = ''
   error.value = ''
@@ -120,20 +120,20 @@ const loadQuestions = async () => {
   }
 }
 
-const loadCategories = async () => {
-  categoriesLoading.value = true
-  categoryError.value = ''
+const loadSubjects = async () => {
+  subjectsLoading.value = true
+  subjectError.value = ''
   try {
-    const { data } = await http.get<AdminCategory[]>('/categories')
-    categories.value = data
-    if (!form.category_id && data.length > 0) {
-      form.category_id = data[0].id
+    const { data } = await http.get<AdminSubject[]>('/subjects')
+    subjects.value = data
+    if (!form.subject_id && data.length > 0) {
+      form.subject_id = data[0].id
     }
   } catch (err) {
-    categoryError.value = 'Unable to load categories.'
+    subjectError.value = 'Unable to load subjects.'
     console.error(err)
   } finally {
-    categoriesLoading.value = false
+    subjectsLoading.value = false
   }
 }
 
@@ -169,19 +169,19 @@ const submit = async () => {
     error.value = 'Mark one option as the correct answer.'
     return
   }
-  if (!form.category_id) {
-    error.value = 'Select a category for this question.'
+  if (!form.subject_id) {
+    error.value = 'Select a subject for this question.'
     return
   }
 
   const payload = {
     prompt: form.prompt,
     explanation: form.explanation || null,
-    subject: form.subject || null,
+    subject_label: form.subject_label || null,
     difficulty: form.difficulty || null,
     is_active: form.is_active,
     options: trimmedOptions,
-    category_id: form.category_id,
+    subject_id: form.subject_id,
   }
 
   try {
@@ -208,11 +208,11 @@ const editQuestion = async (id: number) => {
     editingId.value = data.id
     form.prompt = data.prompt
     form.explanation = data.explanation || ''
-    form.subject = data.subject || ''
+    form.subject_label = data.subject_label || ''
     form.difficulty = data.difficulty || ''
     form.is_active = data.is_active
     form.options = data.options.map((option) => ({ ...option }))
-    form.category_id = data.category.id
+    form.subject_id = data.subject.id
     ensureOptionCount()
   } catch (err) {
     error.value = 'Unable to load question.'
@@ -232,7 +232,7 @@ const deleteQuestion = async (id: number) => {
   }
 }
 
-loadCategories().finally(() => {
+loadSubjects().finally(() => {
   loadQuestions()
 })
 
@@ -279,13 +279,13 @@ watch(
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <RouterLink
-            :to="{ name: 'admin-categories' }"
+            :to="{ name: 'admin-subjects' }"
             class="inline-flex items-center gap-2 rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-500"
           >
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.5 4.5h13M4 10h12M5.5 15.5h9" />
             </svg>
-            Manage categories
+            Manage subjects
           </RouterLink>
           <button
             class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-300 hover:text-brand-600"
@@ -356,11 +356,11 @@ watch(
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v4m0 10v4m7-7h-4M9 12H5m11.657-6.657l-2.829 2.829M9.172 14.828l-2.829 2.829M9.172 7.172 6.343 4.343m11.314 15.314-2.829-2.829" />
               </svg>
             </span>
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Category coverage</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Subject coverage</p>
           </div>
-          <p class="text-3xl font-semibold text-slate-900">{{ usedCategoryCount }}</p>
+          <p class="text-3xl font-semibold text-slate-900">{{ usedSubjectCount }}</p>
           <p class="text-xs text-slate-500">
-            {{ categories.length ? `${categoryCoveragePercent}% of ${categories.length} categories` : 'Create a category to get started.' }}
+            {{ subjects.length ? `${subjectCoveragePercent}% of ${subjects.length} subjects` : 'Create a subject to get started.' }}
           </p>
         </div>
       </article>
@@ -399,30 +399,30 @@ watch(
 
         <div class="space-y-3">
           <div class="flex items-center justify-between gap-3">
-            <label class="text-sm font-semibold text-slate-700" for="category">Category</label>
+            <label class="text-sm font-semibold text-slate-700" for="subject">Subject</label>
             <RouterLink
-              :to="{ name: 'admin-categories' }"
+              :to="{ name: 'admin-subjects' }"
               class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-600 transition hover:text-brand-500"
             >
               Manage
             </RouterLink>
           </div>
           <select
-            id="category"
-            v-model.number="form.category_id"
-            :disabled="categoriesLoading || categories.length === 0"
+            id="subject"
+            v-model.number="form.subject_id"
+            :disabled="subjectsLoading || subjects.length === 0"
             class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-60"
             required
           >
-            <option value="" disabled>Select a category</option>
-            <option v-for="category in categories" :key="category.id" :value="category.id">
-              {{ category.name }}
+            <option value="" disabled>Select a subject</option>
+            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+              {{ subject.name }}
             </option>
           </select>
-          <p v-if="categoriesLoading" class="text-xs text-slate-400">Loading categories…</p>
-          <p v-else-if="categoryError" class="text-xs text-rose-500">{{ categoryError }}</p>
-          <p v-else-if="categories.length === 0" class="text-xs text-slate-500">
-            Create a category before adding questions.
+          <p v-if="subjectsLoading" class="text-xs text-slate-400">Loading subjects…</p>
+          <p v-else-if="subjectError" class="text-xs text-rose-500">{{ subjectError }}</p>
+          <p v-else-if="subjects.length === 0" class="text-xs text-slate-500">
+            Create a subject before adding questions.
           </p>
         </div>
 
@@ -431,7 +431,7 @@ watch(
             <label class="text-sm font-semibold text-slate-700" for="subject">Subject</label>
             <input
               id="subject"
-              v-model="form.subject"
+          v-model="form.subject_label"
               class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
               placeholder="General Knowledge"
             />
@@ -509,8 +509,8 @@ watch(
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             class="inline-flex w-full items-center justify-center rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-900/20 transition hover:bg-brand-500 sm:w-auto"
-            :class="{ 'cursor-not-allowed opacity-60': categories.length === 0 }"
-            :disabled="categories.length === 0"
+            :class="{ 'cursor-not-allowed opacity-60': subjects.length === 0 }"
+            :disabled="subjects.length === 0"
             type="submit"
           >
             {{ editingId ? 'Update question' : 'Create question' }}
@@ -564,10 +564,10 @@ watch(
                 <div class="space-y-3">
                   <div class="flex flex-wrap items-center gap-2 text-xs">
                     <span class="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-600">
-                      {{ question.category_name }}
+                      {{ question.subject_name }}
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
-                      {{ question.subject || 'General' }}
+                      {{ question.subject_label || 'General' }}
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
                       {{ question.difficulty || 'Unrated' }}

@@ -14,7 +14,7 @@ from app.api.routes import practice as practice_routes  # noqa: E402
 from app.api.routes import quizzes as quizzes_routes  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.models.bookmark import Bookmark  # noqa: E402
-from app.models.category import Category  # noqa: E402
+from app.models.subject import Subject  # noqa: E402
 from app.models.organization import Organization, OrgMembership  # noqa: E402
 from app.models.question import Option, Question, QuizQuestion  # noqa: E402
 from app.models.quiz import Quiz  # noqa: E402
@@ -34,14 +34,14 @@ def seed_questions(db: Session) -> Organization:
     db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
-    db.query(Category).delete()
+    db.query(Subject).delete()
     db.query(Organization).delete()
 
     organization = Organization(name="Acme Academy", slug="acme-academy", status="active")
     db.add(organization)
     db.flush()
 
-    category = Category(
+    subject = Subject(
         name="General Knowledge",
         slug="general-knowledge",
         description="World geography, history, science, and current events",
@@ -49,25 +49,25 @@ def seed_questions(db: Session) -> Organization:
         organization_id=organization.id,
     )
 
-    db.add(category)
+    db.add(subject)
     db.flush()
 
     general_question = Question(
         prompt="Capital of Nepal is Kathmandu.",
         explanation="Kathmandu is the capital city of Nepal.",
-        subject="General Knowledge",
+        subject_label="General Knowledge",
         difficulty="Easy",
         is_active=True,
-        category_id=category.id,
+        subject_id=subject.id,
         organization_id=organization.id,
     )
     mixed_question = Question(
         prompt="Select the odd number.",
         explanation="19 is a prime number while the others are even.",
-        subject="General Knowledge",
+        subject_label="General Knowledge",
         difficulty="Medium",
         is_active=True,
-        category_id=category.id,
+        subject_id=subject.id,
         organization_id=organization.id,
     )
 
@@ -135,7 +135,7 @@ def create_b2c_learner(db: Session) -> User:
     return learner
 
 
-def seed_global_questions(db: Session) -> Category:
+def seed_global_questions(db: Session) -> Subject:
     db.query(QuizQuestion).delete()
     db.query(Quiz).delete()
     db.query(OrgMembership).delete()
@@ -143,35 +143,35 @@ def seed_global_questions(db: Session) -> Category:
     db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
-    db.query(Category).delete()
+    db.query(Subject).delete()
     db.query(Organization).delete()
 
-    category = Category(
+    subject = Subject(
         name="General Knowledge",
         slug="general-knowledge",
         description="World geography, history, science, and current events",
         icon="🌍",
         organization_id=None,
     )
-    db.add(category)
+    db.add(subject)
     db.flush()
 
     general_question = Question(
         prompt="Capital of Nepal is Kathmandu.",
         explanation="Kathmandu is the capital city of Nepal.",
-        subject="General Knowledge",
+        subject_label="General Knowledge",
         difficulty="Easy",
         is_active=True,
-        category_id=category.id,
+        subject_id=subject.id,
         organization_id=None,
     )
     mixed_question = Question(
         prompt="Select the odd number.",
         explanation="19 is a prime number while the others are even.",
-        subject="General Knowledge",
+        subject_label="General Knowledge",
         difficulty="Medium",
         is_active=True,
-        category_id=category.id,
+        subject_id=subject.id,
         organization_id=None,
     )
     db.add_all([general_question, mixed_question])
@@ -190,20 +190,23 @@ def seed_global_questions(db: Session) -> Category:
         ]
     )
     db.commit()
-    return category
+    return subject
 
 
-def seed_questions_without_items(db: Session) -> tuple[Organization, Category]:
+def seed_questions_without_items(db: Session) -> tuple[Organization, Subject]:
+    db.query(OrgMembership).delete()
+    db.query(LearnerUser).delete()
+    db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
-    db.query(Category).delete()
+    db.query(Subject).delete()
     db.query(Organization).delete()
 
     organization = Organization(name="News Academy", slug="news-academy", status="active")
     db.add(organization)
     db.flush()
 
-    category = Category(
+    subject = Subject(
         name="General Knowledge",
         slug="general-knowledge",
         description="World geography, history, science, and current events",
@@ -211,32 +214,32 @@ def seed_questions_without_items(db: Session) -> tuple[Organization, Category]:
         organization_id=organization.id,
     )
 
-    db.add(category)
+    db.add(subject)
     db.commit()
 
-    return organization, category
+    return organization, subject
 
 
-def test_practice_categories_reflect_active_questions():
+def test_practice_subjects_reflect_active_questions():
     with TestingSessionLocal() as session:
         organization = seed_questions(session)
         learner = create_learner(session, organization)
-        categories = practice_routes.list_practice_categories(db=session, current_user=learner)
+        subjects = practice_routes.list_practice_subjects(db=session, current_user=learner)
 
-    assert any(category.slug == "general-knowledge" for category in categories)
-    general = next(category for category in categories if category.slug == "general-knowledge")
+    assert any(subject.slug == "general-knowledge" for subject in subjects)
+    general = next(subject for subject in subjects if subject.slug == "general-knowledge")
     assert general.total_questions == 2
     assert general.difficulty == "Mixed"
     assert general.icon == "🌍"
     assert general.description is not None
 
 
-def test_practice_categories_include_quiz_id_when_available():
+def test_practice_subjects_include_quiz_id_when_available():
     with TestingSessionLocal() as session:
         organization = seed_questions(session)
         questions = session.query(Question).all()
         quiz = Quiz(
-            title="Category Mock Exam",
+            title="Subject Mock Exam",
             description=None,
             is_active=True,
             organization_id=organization.id,
@@ -250,17 +253,17 @@ def test_practice_categories_include_quiz_id_when_available():
         session.commit()
 
         learner = create_learner(session, organization)
-        categories = practice_routes.list_practice_categories(db=session, current_user=learner)
+        subjects = practice_routes.list_practice_subjects(db=session, current_user=learner)
 
-    summary = next(item for item in categories if item.slug == "general-knowledge")
+    summary = next(item for item in subjects if item.slug == "general-knowledge")
     assert summary.quiz_id == quiz.id
 
 
-def test_practice_category_detail_returns_questions():
+def test_practice_subject_detail_returns_questions():
     with TestingSessionLocal() as session:
         organization = seed_questions(session)
         learner = create_learner(session, organization)
-        detail = practice_routes.get_practice_category(
+        detail = practice_routes.get_practice_subject(
             slug="general-knowledge",
             limit=10,
             db=session,
@@ -275,12 +278,12 @@ def test_practice_category_detail_returns_questions():
     assert any(option.is_correct for option in detail.questions[0].options)
 
 
-def test_practice_category_without_questions_returns_empty_list():
+def test_practice_subject_without_questions_returns_empty_list():
     with TestingSessionLocal() as session:
-        organization, category = seed_questions_without_items(session)
+        organization, subject = seed_questions_without_items(session)
         learner = create_learner(session, organization)
 
-        detail = practice_routes.get_practice_category(
+        detail = practice_routes.get_practice_subject(
             slug="general-knowledge",
             db=session,
             current_user=learner,
@@ -292,23 +295,23 @@ def test_practice_category_without_questions_returns_empty_list():
     assert detail.slug == "general-knowledge"
 
 
-def test_practice_categories_support_global_scope():
+def test_practice_subjects_support_global_scope():
     with TestingSessionLocal() as session:
-        category = seed_global_questions(session)
+        subject = seed_global_questions(session)
         learner = create_b2c_learner(session)
-        categories = practice_routes.list_practice_categories(db=session, current_user=learner)
+        subjects = practice_routes.list_practice_subjects(db=session, current_user=learner)
 
-    assert any(item.slug == category.slug for item in categories)
-    summary = next(item for item in categories if item.slug == category.slug)
+    assert any(item.slug == subject.slug for item in subjects)
+    summary = next(item for item in subjects if item.slug == subject.slug)
     assert summary.total_questions == 2
     assert summary.organization_id is None
 
 
-def test_practice_category_detail_global_scope():
+def test_practice_subject_detail_global_scope():
     with TestingSessionLocal() as session:
         seed_global_questions(session)
         learner = create_b2c_learner(session)
-        detail = practice_routes.get_practice_category(
+        detail = practice_routes.get_practice_subject(
             slug="general-knowledge",
             db=session,
             current_user=learner,
@@ -399,16 +402,16 @@ def test_list_quizzes_defaults_to_primary_organization():
     assert summary.organization_id == organization.id
 
 
-def test_unknown_category_returns_not_found():
+def test_unknown_subject_returns_not_found():
     with TestingSessionLocal() as session:
         organization = seed_questions(session)
         learner = create_learner(session, organization)
         try:
-            practice_routes.get_practice_category(slug="non-existent", db=session, current_user=learner)
+            practice_routes.get_practice_subject(slug="non-existent", db=session, current_user=learner)
         except Exception as exc:  # noqa: BLE001
             from fastapi import HTTPException
 
             assert isinstance(exc, HTTPException)
             assert exc.status_code == 404
         else:
-            raise AssertionError("Expected HTTPException for unknown category")
+            raise AssertionError("Expected HTTPException for unknown subject")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.params import Query as QueryParam
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -43,6 +44,8 @@ def list_quizzes(
     db: Session = Depends(get_db_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> List[QuizSummary]:
+    if isinstance(organization_id, QueryParam):
+        organization_id = organization_id.default
     restrict_to_global = False
 
     if organization_id is None and current_user is not None:
@@ -159,7 +162,7 @@ def get_quiz(
             QuizQuestionSchema(
                 id=question.id,
                 prompt=question.prompt,
-                subject=question.subject,
+                subject=question.subject_label,
                 difficulty=question.difficulty,
                 options=[
                     QuizQuestionOption(id=option.id, text=option.text) for option in question.options

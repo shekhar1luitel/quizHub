@@ -14,9 +14,9 @@ class AttemptSummary(BaseModel):
     submitted_at: datetime
 
 
-class CategoryAccuracy(BaseModel):
-    category_id: Optional[int]
-    category_name: str
+class SubjectAccuracy(BaseModel):
+    subject_id: Optional[int]
+    subject_name: str
     attempts: int
     average_score: float
 
@@ -33,5 +33,5 @@ class DashboardSummary(BaseModel):
     total_questions_answered: int
     recent_attempts: List[AttemptSummary]
     streak: int
-    category_accuracy: List[CategoryAccuracy]
+    subject_accuracy: List[SubjectAccuracy]
     weekly_activity: List[WeeklyActivityEntry]

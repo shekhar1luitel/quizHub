@@ -10,12 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session, require_learner
 from app.models.attempt import Attempt, AttemptAnswer
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Question
 from app.models.user import User
 from app.schemas.analytics import (
     AnalyticsOverview,
-    CategoryPerformance,
+    SubjectPerformance,
     OverallStats,
     TimeAnalysis,
     WeeklyProgressEntry,
@@ -116,44 +116,44 @@ def get_analytics_overview(
         )
 
     attempt_ids = [attempt.id for attempt in attempts]
-    category_performance: List[CategoryPerformance] = []
+    subject_performance: List[SubjectPerformance] = []
     strengths: List[str] = []
     weaknesses: List[str] = []
 
     if attempt_ids:
-        category_rows = db.execute(
+        subject_rows = db.execute(
             select(
                 Attempt.id.label("attempt_id"),
                 Attempt.finished_at.label("submitted_at"),
-                Category.name.label("category_name"),
+                Subject.name.label("subject_name"),
                 func.count(AttemptAnswer.id).label("answered"),
                 func.sum(case((AttemptAnswer.is_correct.is_(True), 1), else_=0)).label("correct"),
             )
             .join(AttemptAnswer, AttemptAnswer.attempt_id == Attempt.id)
             .join(Question, Question.id == AttemptAnswer.question_id)
-            .join(Category, Category.id == Question.category_id)
+            .join(Subject, Subject.id == Question.subject_id)
             .where(Attempt.id.in_(attempt_ids))
-            .group_by(Attempt.id, Attempt.finished_at, Category.id)
-            .order_by(Category.name, Attempt.finished_at)
+            .group_by(Attempt.id, Attempt.finished_at, Subject.id)
+            .order_by(Subject.name, Attempt.finished_at)
         ).all()
 
-        category_history: Dict[str, List[tuple[datetime, float]]] = defaultdict(list)
-        for row in category_rows:
+        subject_history: Dict[str, List[tuple[datetime, float]]] = defaultdict(list)
+        for row in subject_rows:
             answered = row.answered or 0
             if answered == 0:
                 continue
             accuracy = (row.correct or 0) / answered * 100
-            category_history[row.category_name].append((row.submitted_at, accuracy))
+            subject_history[row.subject_name].append((row.submitted_at, accuracy))
 
-        for category_name, history in category_history.items():
+        for subject_name, history in subject_history.items():
             history.sort(key=lambda item: item[0])
             scores = [entry[1] for entry in history]
             average = sum(scores) / len(scores)
             best = max(scores)
             improvement = scores[-1] - scores[0] if len(scores) > 1 else 0.0
-            category_performance.append(
-                CategoryPerformance(
-                    category=category_name,
+            subject_performance.append(
+                SubjectPerformance(
+                    subject=subject_name,
                     tests=len(history),
                     average_score=round(average, 2),
                     best_score=round(best, 2),
@@ -161,11 +161,11 @@ def get_analytics_overview(
                 )
             )
 
-        category_performance.sort(key=lambda entry: entry.average_score, reverse=True)
+        subject_performance.sort(key=lambda entry: entry.average_score, reverse=True)
 
-        if category_performance:
-            strengths = [entry.category for entry in category_performance if entry.average_score >= 75]
-            weaknesses = [entry.category for entry in category_performance if entry.average_score < 55]
+        if subject_performance:
+            strengths = [entry.subject for entry in subject_performance if entry.average_score >= 75]
+            weaknesses = [entry.subject for entry in subject_performance if entry.average_score < 55]
             strengths = strengths[:3]
             weaknesses = weaknesses[:3]
 
@@ -180,7 +180,7 @@ def get_analytics_overview(
     return AnalyticsOverview(
         generated_at=datetime.now(timezone.utc),
         overall_stats=overall,
-        category_performance=category_performance,
+        subject_performance=subject_performance,
         weekly_progress=weekly_progress,
         time_analysis=time_analysis,
         strengths=strengths,

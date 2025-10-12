@@ -14,8 +14,8 @@ interface AnalyticsOverallStats {
   streak: number
 }
 
-interface AnalyticsCategoryPerformance {
-  category: string
+interface AnalyticsSubjectPerformance {
+  subject: string
   tests: number
   average_score: number
   best_score: number
@@ -39,7 +39,7 @@ interface AnalyticsTimeAnalysis {
 interface AnalyticsOverview {
   generated_at: string
   overall_stats: AnalyticsOverallStats
-  category_performance: AnalyticsCategoryPerformance[]
+  subject_performance: AnalyticsSubjectPerformance[]
   weekly_progress: AnalyticsWeeklyProgressEntry[]
   time_analysis?: AnalyticsTimeAnalysis | null
   strengths: string[]
@@ -224,22 +224,22 @@ const progressBarWidth = (value: number) => `${Math.min(Math.max(value, 0), 100)
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <header class="flex items-center justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900">Category performance</h2>
+            <h2 class="text-lg font-semibold text-slate-900">Subject performance</h2>
             <p class="text-xs text-slate-500">Understand how you’re performing across subjects.</p>
           </div>
         </header>
-        <p v-if="analytics.category_performance.length === 0" class="mt-6 text-sm text-slate-500">
-          We need a bit more activity before we can surface category insights.
+        <p v-if="analytics.subject_performance.length === 0" class="mt-6 text-sm text-slate-500">
+          We need a bit more activity before we can surface subject insights.
         </p>
         <ul v-else class="mt-6 space-y-4 text-sm">
           <li
-            v-for="entry in analytics.category_performance"
-            :key="entry.category"
+            v-for="entry in analytics.subject_performance"
+            :key="entry.subject"
             class="rounded-2xl border border-slate-200 p-4"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-semibold text-slate-900">{{ entry.category }}</p>
+                <p class="font-semibold text-slate-900">{{ entry.subject }}</p>
                 <p class="text-xs text-slate-500">{{ entry.tests }} assessments</p>
               </div>
               <p :class="['text-lg font-semibold', scoreColour(entry.average_score)]">{{ entry.average_score.toFixed(1) }}%</p>

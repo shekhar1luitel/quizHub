@@ -1,4 +1,4 @@
-"""scope categories and questions to organizations
+"""scope subjects and questions to organizations
 
 Revision ID: 202410221010_scope_org_content
 Revises: 202410220930
@@ -18,13 +18,13 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column(
-        "categories",
+        "subjects",
         sa.Column("organization_id", sa.Integer(), nullable=True),
     )
-    op.create_index("ix_categories_organization_id", "categories", ["organization_id"])
+    op.create_index("ix_subjects_organization_id", "subjects", ["organization_id"])
     op.create_foreign_key(
-        "fk_categories_organization",
-        "categories",
+        "fk_subjects_organization",
+        "subjects",
         "organizations",
         ["organization_id"],
         ["id"],
@@ -45,22 +45,22 @@ def upgrade() -> None:
         ondelete="CASCADE",
     )
 
-    op.drop_constraint("categories_name_key", "categories", type_="unique")
-    op.drop_constraint("categories_slug_key", "categories", type_="unique")
+    op.drop_constraint("subjects_name_key", "subjects", type_="unique")
+    op.drop_constraint("subjects_slug_key", "subjects", type_="unique")
     op.create_unique_constraint(
-        "uq_categories_org_name", "categories", ["organization_id", "name"]
+        "uq_subjects_org_name", "subjects", ["organization_id", "name"]
     )
     op.create_unique_constraint(
-        "uq_categories_org_slug", "categories", ["organization_id", "slug"]
+        "uq_subjects_org_slug", "subjects", ["organization_id", "slug"]
     )
-    op.create_index("ix_categories_name", "categories", ["name"])
+    op.create_index("ix_subjects_name", "subjects", ["name"])
 
     op.execute(
         """
         UPDATE questions
-        SET organization_id = categories.organization_id
-        FROM categories
-        WHERE categories.id = questions.category_id
+        SET organization_id = subjects.organization_id
+        FROM subjects
+        WHERE subjects.id = questions.subject_id
         """
     )
 
@@ -73,16 +73,16 @@ def downgrade() -> None:
         """
     )
 
-    op.drop_constraint("uq_categories_org_slug", "categories", type_="unique")
-    op.drop_constraint("uq_categories_org_name", "categories", type_="unique")
-    op.create_unique_constraint("categories_slug_key", "categories", ["slug"])
-    op.create_unique_constraint("categories_name_key", "categories", ["name"])
+    op.drop_constraint("uq_subjects_org_slug", "subjects", type_="unique")
+    op.drop_constraint("uq_subjects_org_name", "subjects", type_="unique")
+    op.create_unique_constraint("subjects_slug_key", "subjects", ["slug"])
+    op.create_unique_constraint("subjects_name_key", "subjects", ["name"])
 
     op.drop_constraint("fk_questions_organization", "questions", type_="foreignkey")
     op.drop_index("ix_questions_organization_id", table_name="questions")
     op.drop_column("questions", "organization_id")
 
-    op.drop_constraint("fk_categories_organization", "categories", type_="foreignkey")
-    op.drop_index("ix_categories_organization_id", table_name="categories")
-    op.drop_index("ix_categories_name", table_name="categories")
-    op.drop_column("categories", "organization_id")
+    op.drop_constraint("fk_subjects_organization", "subjects", type_="foreignkey")
+    op.drop_index("ix_subjects_organization_id", table_name="subjects")
+    op.drop_index("ix_subjects_name", table_name="subjects")
+    op.drop_column("subjects", "organization_id")

@@ -20,7 +20,7 @@ interface PracticeQuestionResponse {
   options: PracticeQuestionOption[]
 }
 
-interface PracticeCategoryDetail {
+interface PracticeSubjectDetail {
   slug: string
   name: string
   description?: string | null
@@ -41,10 +41,10 @@ interface PracticeQuestionView {
 }
 
 const route = useRoute()
-const categorySlug = computed(() => String(route.params.slug || ''))
-const isBookmarkRevision = computed(() => categorySlug.value === 'bookmarks')
+const subjectSlug = computed(() => String(route.params.slug || ''))
+const isBookmarkRevision = computed(() => subjectSlug.value === 'bookmarks')
 
-const category = ref<PracticeCategoryDetail | null>(null)
+const subject = ref<PracticeSubjectDetail | null>(null)
 const questions = ref<PracticeQuestionView[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -84,12 +84,12 @@ const transformQuestion = (question: PracticeQuestionResponse): PracticeQuestion
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 
-const categoryIcon = computed(() => category.value?.icon?.trim() || fallbackIcon)
+const subjectIcon = computed(() => subject.value?.icon?.trim() || fallbackIcon)
 const backDestination = computed(() =>
-  isBookmarkRevision.value ? { name: 'bookmarks' } : { name: 'categories' }
+  isBookmarkRevision.value ? { name: 'bookmarks' } : { name: 'subjects' }
 )
 const backLabel = computed(() =>
-  isBookmarkRevision.value ? 'Back to bookmarks' : 'Back to categories'
+  isBookmarkRevision.value ? 'Back to bookmarks' : 'Back to subjects'
 )
 
 const selectAnswer = (optionIndex: number) => {
@@ -150,33 +150,33 @@ const difficultyBadge = (difficulty: Difficulty) => {
 const emptyStateMessage = computed(() =>
   isBookmarkRevision.value
     ? 'You haven’t bookmarked any questions yet. Save questions during quizzes to build a personalised revision set.'
-    : 'No practice questions are available for this category yet. Add new questions from the admin panel to get started.'
+    : 'No practice questions are available for this subject yet. Add new questions from the admin panel to get started.'
 )
 
 const loadPracticeSet = async () => {
-  if (!categorySlug.value) return
+  if (!subjectSlug.value) return
   loading.value = true
   error.value = ''
   try {
     const endpoint =
-      categorySlug.value === 'bookmarks'
+      subjectSlug.value === 'bookmarks'
         ? '/practice/bookmarks'
-        : `/practice/categories/${categorySlug.value}`
-    const { data } = await http.get<PracticeCategoryDetail>(endpoint)
-    category.value = data
+        : `/practice/subjects/${subjectSlug.value}`
+    const { data } = await http.get<PracticeSubjectDetail>(endpoint)
+    subject.value = data
     questions.value = data.questions.map(transformQuestion)
     resetState()
   } catch (err) {
     console.error(err)
     error.value = 'Unable to load practice questions.'
-    category.value = null
+    subject.value = null
     questions.value = []
   } finally {
     loading.value = false
   }
 }
 
-watch(categorySlug, () => {
+watch(subjectSlug, () => {
   loadPracticeSet()
 })
 
@@ -195,16 +195,16 @@ loadPracticeSet()
       </RouterLink>
       <div class="flex flex-1 items-start gap-4">
         <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900/10 text-2xl">
-          {{ categoryIcon }}
+          {{ subjectIcon }}
         </span>
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Practice</p>
-          <h1 class="mt-2 text-3xl font-semibold text-slate-900">{{ category?.name || 'Reinforcement mode' }}</h1>
+          <h1 class="mt-2 text-3xl font-semibold text-slate-900">{{ subject?.name || 'Reinforcement mode' }}</h1>
           <p class="mt-2 text-sm text-slate-500">
-            {{ category?.description?.trim() || fallbackDescription }}
+            {{ subject?.description?.trim() || fallbackDescription }}
           </p>
           <p class="mt-2 text-xs font-medium uppercase tracking-[0.3em] text-slate-400">
-            {{ category?.difficulty || 'Mixed' }} focus · {{ category?.total_questions ?? questions.length }} questions ·
+            {{ subject?.difficulty || 'Mixed' }} focus · {{ subject?.total_questions ?? questions.length }} questions ·
             Question {{ questions.length ? currentIndex + 1 : 0 }} of {{ questions.length }}
           </p>
         </div>

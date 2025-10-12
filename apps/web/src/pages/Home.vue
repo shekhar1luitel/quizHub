@@ -15,7 +15,7 @@ interface HeroQuizSummary {
   organization_id?: number | null
 }
 
-interface PracticeCategorySummary {
+interface PracticeSubjectSummary {
   slug: string
   name: string
   description?: string | null
@@ -34,9 +34,9 @@ interface DashboardAttemptSummary {
   submitted_at: string
 }
 
-interface DashboardCategoryAccuracy {
-  category_id: number | null
-  category_name: string
+interface DashboardSubjectAccuracy {
+  subject_id: number | null
+  subject_name: string
   attempts: number
   average_score: number
 }
@@ -53,7 +53,7 @@ interface DashboardSummary {
   total_questions_answered: number
   recent_attempts: DashboardAttemptSummary[]
   streak: number
-  category_accuracy: DashboardCategoryAccuracy[]
+  subject_accuracy: DashboardSubjectAccuracy[]
   weekly_activity: DashboardWeeklyActivity[]
 }
 
@@ -70,10 +70,10 @@ interface QuickAction {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const featuredQuizzes = ref<HeroQuizSummary[]>([])
-const topCategories = ref<PracticeCategorySummary[]>([])
+const topSubjects = ref<PracticeSubjectSummary[]>([])
 const dashboardSummary = ref<DashboardSummary | null>(null)
 const quizMetrics = ref({ total: 0, active: 0 })
-const categoryMetrics = ref({ total: 0, questions: 0 })
+const subjectMetrics = ref({ total: 0, questions: 0 })
 
 const primaryCtaLabel = computed(() => {
   if (!auth.isAuthenticated) return 'Start Practicing'
@@ -93,7 +93,7 @@ const primaryCtaRoute = computed(() => {
 
 const secondaryCtaLabel = computed(() => {
   if (!auth.isAuthenticated) return 'Login'
-  if (auth.isLearner) return 'Browse categories'
+  if (auth.isLearner) return 'Browse subjects'
   if (auth.isSuperuser) return 'Manage users'
   if (auth.isAdmin) return 'Manage quizzes'
   return 'Account settings'
@@ -101,7 +101,7 @@ const secondaryCtaLabel = computed(() => {
 
 const secondaryCtaRoute = computed(() => {
   if (!auth.isAuthenticated) return { name: 'login' }
-  if (auth.isLearner) return { name: 'categories' }
+  if (auth.isLearner) return { name: 'subjects' }
   if (auth.isSuperuser) return { name: 'admin-users' }
   if (auth.isAdmin) return { name: 'admin-quizzes' }
   return { name: 'settings' }
@@ -122,7 +122,7 @@ const heroDescription = computed(() => {
     return 'Review today’s numbers, revisit analytics, and jump straight into your next quiz.'
   }
   if (auth.isAdmin) {
-    return 'Review active content, ensure categories stay fresh, and keep the learning experience running smoothly.'
+    return 'Review active content, ensure subjects stay fresh, and keep the learning experience running smoothly.'
   }
   return 'Build confidence with curated question banks, timed mock tests, and rich explanations. Track progress on your personal dashboard and tackle weak areas faster.'
 })
@@ -175,8 +175,8 @@ const adminCards = computed(() => {
   if (!auth.isAdmin) return []
   const active = quizMetrics.value.active
   const totalQuizzes = quizMetrics.value.total
-  const totalCategories = categoryMetrics.value.total
-  const totalQuestions = categoryMetrics.value.questions
+  const totalSubjects = subjectMetrics.value.total
+  const totalQuestions = subjectMetrics.value.questions
   return [
     {
       label: 'Active quizzes',
@@ -187,8 +187,8 @@ const adminCards = computed(() => {
       valueClass: 'text-slate-900',
     },
     {
-      label: 'Practice categories',
-      value: totalCategories.toString(),
+      label: 'Practice subjects',
+      value: totalSubjects.toString(),
       caption: 'Subjects currently published.',
       valueClass: 'text-slate-900',
     },
@@ -226,24 +226,24 @@ const loadHomeData = async () => {
     }
   }
 
-  const fetchCategories = async () => {
+  const fetchSubjects = async () => {
     try {
-      const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
-      categoryMetrics.value = {
+      const { data } = await http.get<PracticeSubjectSummary[]>('/practice/subjects')
+      subjectMetrics.value = {
         total: data.length,
         questions: data.reduce((sum, item) => sum + (item.total_questions ?? 0), 0),
       }
-      topCategories.value = data.slice(0, 4)
+      topSubjects.value = data.slice(0, 4)
     } catch (err) {
       console.error(err)
       const status = (err as AxiosError).response?.status
       if (status === 401 || status === 403) {
-        topCategories.value = []
+        topSubjects.value = []
         error.value = null
       } else {
         error.value = 'We could not load the latest practice data. Please try again soon.'
       }
-      categoryMetrics.value = { total: 0, questions: 0 }
+      subjectMetrics.value = { total: 0, questions: 0 }
     }
   }
 
@@ -262,7 +262,7 @@ const loadHomeData = async () => {
   }
 
   try {
-    await Promise.all([fetchQuizzes(), fetchCategories(), fetchSummary()])
+    await Promise.all([fetchQuizzes(), fetchSubjects(), fetchSummary()])
   } finally {
     loading.value = false
   }
@@ -291,9 +291,9 @@ const quickActions = computed<QuickAction[]>(() => {
         `,
       },
       {
-        label: 'Organise categories',
+        label: 'Organise subjects',
         description: 'Tidy your taxonomy so practice sets stay focused.',
-        to: { name: 'admin-categories' },
+        to: { name: 'admin-subjects' },
         icon: `
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5zM12.75 6.75H19.5v6.75h-6.75zM4.5 15.75h6.75v6.75H4.5zM12.75 15.75H19.5v6.75h-6.75z" />
         `,
@@ -314,8 +314,8 @@ const quickActions = computed<QuickAction[]>(() => {
       },
       {
         label: 'Practice by subject',
-        description: 'Pick a category and drill questions immediately.',
-        to: { name: 'categories' },
+        description: 'Pick a subject and drill questions immediately.',
+        to: { name: 'subjects' },
         icon: `
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 3.75h6.75v6.75H4.5zM12.75 13.5H19.5v6.75h-6.75zM12.75 3.75h6.75v6.75h-6.75zM4.5 13.5h6.75v6.75H4.5z" />
         `,
@@ -333,9 +333,9 @@ const quickActions = computed<QuickAction[]>(() => {
 
   return [
     {
-      label: 'Browse categories',
+      label: 'Browse subjects',
       description: 'Preview the curriculum and try sample questions.',
-      to: { name: 'categories' },
+      to: { name: 'subjects' },
       icon: `
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6.75v6.75H4.5zM12.75 5.25h6.75v6.75h-6.75zM4.5 13.5h6.75v6.75H4.5zM12.75 13.5h6.75v6.75h-6.75z" />
       `,
@@ -530,41 +530,41 @@ const quickActionsSubtitle = computed(() => {
       <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Choose a focus</p>
-          <h2 class="text-2xl font-semibold text-slate-900">Top practice categories</h2>
+          <h2 class="text-2xl font-semibold text-slate-900">Top practice subjects</h2>
           <p class="text-sm text-slate-500">Dive into popular subjects or keep exploring to find your next challenge.</p>
         </div>
         <RouterLink
-          :to="{ name: 'categories' }"
+          :to="{ name: 'subjects' }"
           class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-600"
         >
-          View all categories
+          View all subjects
           <span aria-hidden="true">→</span>
         </RouterLink>
       </header>
 
       <div v-if="loading" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div v-for="n in 4" :key="`category-skeleton-${n}`" class="h-40 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"></div>
+        <div v-for="n in 4" :key="`subject-skeleton-${n}`" class="h-40 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"></div>
       </div>
-      <div v-else-if="topCategories.length === 0" class="rounded-3xl border border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
-        Categories will appear here once they are created in the admin panel.
+      <div v-else-if="topSubjects.length === 0" class="rounded-3xl border border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
+        Subjects will appear here once they are created in the admin panel.
       </div>
       <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article
-          v-for="category in topCategories"
-          :key="category.slug"
+          v-for="subject in topSubjects"
+          :key="subject.slug"
           class="flex h-full flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
         >
           <div class="space-y-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">{{ category.difficulty }}</p>
-            <h3 class="text-lg font-semibold text-slate-900">{{ category.name }}</h3>
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">{{ subject.difficulty }}</p>
+            <h3 class="text-lg font-semibold text-slate-900">{{ subject.name }}</h3>
             <p class="text-xs text-slate-500">
-              {{ category.description || 'Sharpen your fundamentals with curated question sets.' }}
+              {{ subject.description || 'Sharpen your fundamentals with curated question sets.' }}
             </p>
           </div>
           <div class="mt-auto flex items-center justify-between text-xs text-slate-500">
-            <span>{{ category.total_questions }} questions</span>
+            <span>{{ subject.total_questions }} questions</span>
             <RouterLink
-              :to="{ name: 'practice', params: { slug: category.slug } }"
+              :to="{ name: 'practice', params: { slug: subject.slug } }"
               class="inline-flex items-center gap-1 text-brand-600 transition hover:text-brand-500"
             >
               Practice
@@ -587,7 +587,7 @@ const quickActionsSubtitle = computed(() => {
           <ul class="space-y-3 text-sm text-slate-600">
             <li class="flex items-start gap-2">
               <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
-              Track streaks, accuracy, and category performance on a single dashboard.
+              Track streaks, accuracy, and subject performance on a single dashboard.
             </li>
             <li class="flex items-start gap-2">
               <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>

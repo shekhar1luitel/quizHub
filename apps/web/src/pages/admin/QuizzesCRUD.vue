@@ -15,7 +15,7 @@ interface QuizSummary {
 interface QuizQuestionDetail {
   id: number
   prompt: string
-  subject?: string | null
+  subject_label?: string | null
   difficulty?: string | null
 }
 
@@ -30,12 +30,12 @@ interface QuizDetail {
 interface QuestionSummary {
   id: number
   prompt: string
-  subject?: string | null
+  subject_label?: string | null
   difficulty?: string | null
   is_active: boolean
   option_count: number
-  category_id: number
-  category_name: string
+  subject_id: number
+  subject_name: string
 }
 
 const quizzes = ref<QuizSummary[]>([])
@@ -64,8 +64,8 @@ const filteredQuestions = computed(() => {
   return questions.value.filter((question) => {
     const haystacks = [
       question.prompt,
-      question.category_name,
-      question.subject || '',
+      question.subject_name,
+      question.subject_label || '',
       question.difficulty || '',
     ]
     return haystacks.some((value) => value.toLowerCase().includes(term))
@@ -275,7 +275,7 @@ watch(
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Total quizzes</p>
         <p class="mt-3 text-3xl font-semibold text-slate-900">{{ quizzes.length }}</p>
-        <p class="text-xs text-slate-500">Across all categories and subjects.</p>
+        <p class="text-xs text-slate-500">Across all subjects and subjects.</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Active quizzes</p>
@@ -339,11 +339,11 @@ watch(
                   <span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/90 text-[11px] text-white">
                     {{ index + 1 }}
                   </span>
-                  {{ question.category_name }}
+                  {{ question.subject_name }}
                 </p>
                 <p class="text-sm font-semibold text-slate-900">{{ question.prompt }}</p>
                 <div class="flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-[0.25em] text-slate-400">
-                  <span>{{ question.subject || 'General' }}</span>
+                  <span>{{ question.subject_label || 'General' }}</span>
                   <span>•</span>
                   <span>{{ question.difficulty || 'Mixed' }}</span>
                 </div>
@@ -385,7 +385,7 @@ watch(
             <input
               v-model="questionSearch"
               class="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100 sm:w-72"
-              placeholder="Search by prompt, category, or subject"
+              placeholder="Search by prompt, subject label, or subject"
               type="search"
             />
           </div>
@@ -402,9 +402,9 @@ watch(
               <div class="flex items-start justify-between gap-3">
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
-                    <span>{{ question.category_name }}</span>
+                    <span>{{ question.subject_name }}</span>
                     <span>•</span>
-                    <span>{{ question.subject || 'General' }}</span>
+                    <span>{{ question.subject_label || 'General' }}</span>
                     <span>•</span>
                     <span>{{ question.difficulty || 'Mixed' }}</span>
                   </div>

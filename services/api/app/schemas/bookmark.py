@@ -16,7 +16,7 @@ class BookmarkOut(BaseModel):
     prompt: str
     subject: str | None
     difficulty: str | None
-    category_id: int
-    category_name: str
+    subject_id: int
+    subject_name: str
 
     model_config = ConfigDict(from_attributes=True)

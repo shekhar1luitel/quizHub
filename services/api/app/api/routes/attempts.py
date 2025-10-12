@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.difficulty import difficulty_label, normalized_difficulty
 from app.api.deps import get_db_session, require_learner
 from app.models.attempt import Attempt, AttemptAnswer
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Question, QuizQuestion
 from app.models.organization import Organization
 from app.models.quiz import Quiz
@@ -178,39 +178,39 @@ def list_attempt_history(
     answer_rows = db.execute(
         select(
             AttemptAnswer.attempt_id,
-            Question.category_id,
+            Question.subject_id,
             Question.difficulty,
         )
         .join(Question, Question.id == AttemptAnswer.question_id)
         .where(AttemptAnswer.attempt_id.in_(attempt_ids))
     ).all()
 
-    category_counts: Dict[int, Dict[Optional[int], int]] = defaultdict(lambda: defaultdict(int))
-    category_names: Dict[Tuple[int, Optional[int]], str] = {}
+    subject_counts: Dict[int, Dict[Optional[int], int]] = defaultdict(lambda: defaultdict(int))
+    subject_names: Dict[Tuple[int, Optional[int]], str] = {}
     difficulty_map: Dict[int, List[str]] = defaultdict(list)
 
-    # Fetch category names in a separate query to reduce duplicates.
+    # Fetch subject names in a separate query to reduce duplicates.
     if answer_rows:
-        category_ids = {row.category_id for row in answer_rows if row.category_id is not None}
-        if category_ids:
-            category_lookup = dict(
+        subject_ids = {row.subject_id for row in answer_rows if row.subject_id is not None}
+        if subject_ids:
+            subject_lookup = dict(
                 db.execute(
-                    select(Category.id, Category.name).where(Category.id.in_(category_ids))
+                    select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
                 ).all()
             )
         else:
-            category_lookup = {}
+            subject_lookup = {}
 
         for row in answer_rows:
             attempt_id = row.attempt_id
-            category_id = row.category_id
-            category_counts[attempt_id][category_id] += 1
+            subject_id = row.subject_id
+            subject_counts[attempt_id][subject_id] += 1
 
-            if category_id is not None:
-                category_name = category_lookup.get(category_id, "General Practice")
+            if subject_id is not None:
+                subject_name = subject_lookup.get(subject_id, "General Practice")
             else:
-                category_name = "General Practice"
-            category_names[(attempt_id, category_id)] = category_name
+                subject_name = "General Practice"
+            subject_names[(attempt_id, subject_id)] = subject_name
 
             normalized = normalized_difficulty(row.difficulty)
             if normalized:
@@ -218,17 +218,17 @@ def list_attempt_history(
 
     history: List[AttemptHistoryEntry] = []
     for attempt in attempts:
-        top_category_id: Optional[int] = None
-        top_category_name: Optional[str] = None
+        top_subject_id: Optional[int] = None
+        top_subject_name: Optional[str] = None
 
-        counts = category_counts.get(attempt.id)
+        counts = subject_counts.get(attempt.id)
         if counts:
-            sorted_categories = sorted(
+            sorted_subjects = sorted(
                 counts.items(),
-                key=lambda item: (-item[1], category_names.get((attempt.id, item[0]), "")),
+                key=lambda item: (-item[1], subject_names.get((attempt.id, item[0]), "")),
             )
-            top_category_id = sorted_categories[0][0]
-            top_category_name = category_names.get((attempt.id, top_category_id), "General Practice")
+            top_subject_id = sorted_subjects[0][0]
+            top_subject_name = subject_names.get((attempt.id, top_subject_id), "General Practice")
 
         difficulties = difficulty_map.get(attempt.id, [])
         difficulty = difficulty_label(difficulties) if difficulties else "Mixed"
@@ -243,8 +243,8 @@ def list_attempt_history(
                 correct_answers=attempt.correct_answers,
                 score=float(attempt.score),
                 duration_seconds=attempt.duration_seconds or 0,
-                category_id=top_category_id,
-                category_name=top_category_name,
+                subject_id=top_subject_id,
+                subject_name=top_subject_name,
                 difficulty=difficulty,
             )
         )

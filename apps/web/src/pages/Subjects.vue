@@ -9,7 +9,7 @@ import { useAuthStore } from '../stores/auth'
 type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Mixed'
 type DifficultyFilter = 'All' | Difficulty
 
-interface PracticeCategorySummary {
+interface PracticeSubjectSummary {
   slug: string
   name: string
   description?: string | null
@@ -21,7 +21,7 @@ interface PracticeCategorySummary {
   organization_id?: number | null
 }
 
-interface DisplayCategory {
+interface DisplaySubject {
   slug: string
   name: string
   icon: string
@@ -39,7 +39,7 @@ const searchTerm = ref('')
 const selectedDifficulty = ref<DifficultyFilter>('All')
 const loading = ref(true)
 const error = ref('')
-const categories = ref<PracticeCategorySummary[]>([])
+const subjects = ref<PracticeSubjectSummary[]>([])
 
 const auth = useAuthStore()
 const inactiveMessage = ref('')
@@ -53,28 +53,28 @@ const normalizeDifficulty = (value: string | null | undefined): Difficulty => {
   return 'Mixed'
 }
 
-const decoratedCategories = computed<DisplayCategory[]>(() =>
-  categories.value.map((category) => ({
-    slug: category.slug,
-    name: category.name,
-    icon: category.icon?.trim() || fallbackIcon,
-    totalQuestions: category.total_questions,
-    description: category.description?.trim() || fallbackDescription,
-    difficulty: normalizeDifficulty(category.difficulty),
-    difficulties: category.difficulties,
-    quizId: category.quiz_id ?? null,
+const decoratedSubjects = computed<DisplaySubject[]>(() =>
+  subjects.value.map((subject) => ({
+    slug: subject.slug,
+    name: subject.name,
+    icon: subject.icon?.trim() || fallbackIcon,
+    totalQuestions: subject.total_questions,
+    description: subject.description?.trim() || fallbackDescription,
+    difficulty: normalizeDifficulty(subject.difficulty),
+    difficulties: subject.difficulties,
+    quizId: subject.quiz_id ?? null,
   }))
 )
 
-const filteredCategories = computed(() => {
+const filteredSubjects = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
-  return decoratedCategories.value.filter((category) => {
+  return decoratedSubjects.value.filter((subject) => {
     const matchesSearch =
       !term ||
-      category.name.toLowerCase().includes(term) ||
-      category.description.toLowerCase().includes(term)
+      subject.name.toLowerCase().includes(term) ||
+      subject.description.toLowerCase().includes(term)
     const matchesDifficulty =
-      selectedDifficulty.value === 'All' || category.difficulty === selectedDifficulty.value
+      selectedDifficulty.value === 'All' || subject.difficulty === selectedDifficulty.value
     return matchesSearch && matchesDifficulty
   })
 })
@@ -92,38 +92,38 @@ const difficultyClasses = (difficulty: Difficulty) => {
   }
 }
 
-const loadCategories = async () => {
+const loadSubjects = async () => {
   loading.value = true
   error.value = ''
   inactiveMessage.value = ''
-  categories.value = []
+  subjects.value = []
   await auth.initialize()
 
   try {
-    const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
-    categories.value = data
+    const { data } = await http.get<PracticeSubjectSummary[]>('/practice/subjects')
+    subjects.value = data
     if (auth.isAuthenticated && !auth.isLearner && data.length === 0) {
       inactiveMessage.value =
-        'Practice categories are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
+        'Practice subjects are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
     }
   } catch (err) {
     console.error(err)
     const status = (err as AxiosError).response?.status ?? 0
     if (status === 401) {
-      inactiveMessage.value = 'Sign in as a learner to explore personalized practice categories.'
+      inactiveMessage.value = 'Sign in as a learner to explore personalized practice subjects.'
     } else if (status === 403) {
       inactiveMessage.value = auth.isLearner
-        ? 'We were unable to load practice categories for this account. Please contact your administrator.'
-        : 'Practice categories are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
+        ? 'We were unable to load practice subjects for this account. Please contact your administrator.'
+        : 'Practice subjects are only available to learner accounts. Switch to a learner profile to explore mock-test topics.'
     } else {
-      error.value = 'Unable to load categories.'
+      error.value = 'Unable to load subjects.'
     }
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadCategories)
+onMounted(loadSubjects)
 </script>
 
 <template>
@@ -140,7 +140,7 @@ onMounted(loadCategories)
         <div class="flex items-center gap-3 text-slate-900">
           <span class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/10 text-lg">📚</span>
           <div>
-            <h1 class="text-3xl font-semibold">Practice categories</h1>
+            <h1 class="text-3xl font-semibold">Practice subjects</h1>
             <p class="text-sm text-slate-500">Find a subject to focus your next practice session.</p>
           </div>
         </div>
@@ -150,7 +150,7 @@ onMounted(loadCategories)
           <input
             v-model="searchTerm"
             type="search"
-            placeholder="Search categories or descriptions..."
+            placeholder="Search subjects or descriptions..."
             class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
           />
           <span class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400">Search</span>
@@ -186,43 +186,43 @@ onMounted(loadCategories)
     </p>
 
     <div
-      v-else-if="filteredCategories.length === 0"
+      v-else-if="filteredSubjects.length === 0"
       class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500"
     >
-      No categories match your filters yet. Try a different search term.
+      No subjects match your filters yet. Try a different search term.
     </div>
 
     <div v-else class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       <article
-        v-for="category in filteredCategories"
-        :key="category.slug"
+        v-for="subject in filteredSubjects"
+        :key="subject.slug"
         class="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
       >
         <header class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-3">
-            <span class="text-3xl">{{ category.icon }}</span>
+            <span class="text-3xl">{{ subject.icon }}</span>
             <div>
-              <h2 class="text-xl font-semibold text-slate-900">{{ category.name }}</h2>
+              <h2 class="text-xl font-semibold text-slate-900">{{ subject.name }}</h2>
               <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                <span :class="['inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold', difficultyClasses(category.difficulty)]">
-                  {{ category.difficulty }}
+                <span :class="['inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold', difficultyClasses(subject.difficulty)]">
+                  {{ subject.difficulty }}
                 </span>
                 <span>
-                  {{ category.totalQuestions }} questions available
+                  {{ subject.totalQuestions }} questions available
                 </span>
               </div>
             </div>
           </div>
         </header>
 
-        <p class="text-sm leading-6 text-slate-600">{{ category.description }}</p>
+        <p class="text-sm leading-6 text-slate-600">{{ subject.description }}</p>
 
         <div>
           <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Difficulty coverage</h3>
-          <ul v-if="category.difficulties.length" class="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          <ul v-if="subject.difficulties.length" class="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
             <li
-              v-for="level in category.difficulties"
-              :key="`${category.slug}-${level}`"
+              v-for="level in subject.difficulties"
+              :key="`${subject.slug}-${level}`"
               class="rounded-full border border-slate-200 px-3 py-1"
             >
               {{ level }}
@@ -233,8 +233,8 @@ onMounted(loadCategories)
 
         <div class="mt-auto flex gap-3 text-sm font-semibold">
           <RouterLink
-            v-if="category.quizId !== null"
-            :to="{ name: 'quiz', params: { id: category.quizId } }"
+            v-if="subject.quizId !== null"
+            :to="{ name: 'quiz', params: { id: subject.quizId } }"
             class="flex-1 rounded-full bg-slate-900 px-4 py-2 text-center text-white transition hover:bg-slate-700"
           >
             Start quiz
@@ -248,8 +248,8 @@ onMounted(loadCategories)
             Quiz coming soon
           </button>
           <RouterLink
-            v-if="category.totalQuestions > 0"
-            :to="{ name: 'practice', params: { slug: category.slug } }"
+            v-if="subject.totalQuestions > 0"
+            :to="{ name: 'practice', params: { slug: subject.slug } }"
             class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-center text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
           >
             Practice

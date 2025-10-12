@@ -19,7 +19,7 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.attempt import Attempt, AttemptAnswer  # noqa: E402
 from app.models.bookmark import Bookmark  # noqa: E402
-from app.models.category import Category  # noqa: E402
+from app.models.subject import Subject  # noqa: E402
 from app.models.question import Option, Question, QuizQuestion  # noqa: E402
 from app.models.quiz import Quiz  # noqa: E402
 from app.models.user import User  # noqa: E402
@@ -64,7 +64,7 @@ def reset_database():
         session.query(Option).delete()
         session.query(Bookmark).delete()
         session.query(Question).delete()
-        session.query(Category).delete()
+        session.query(Subject).delete()
         session.query(Quiz).delete()
         session.query(User).delete()
         session.commit()
@@ -80,23 +80,23 @@ def test_attempt_history_returns_data():
 
         _current_user["user"] = user
 
-        category = Category(
+        subject = Subject(
             name="General Knowledge",
             slug="general-knowledge",
             description="General awareness",
             icon="🌍",
         )
-        session.add(category)
+        session.add(subject)
         session.commit()
-        session.refresh(category)
+        session.refresh(subject)
 
         question = Question(
             prompt="Capital city of Nepal?",
             explanation="Kathmandu is the capital city.",
-            subject="Geography",
+            subject_label="Geography",
             difficulty="Easy",
             is_active=True,
-            category_id=category.id,
+            subject_id=subject.id,
         )
         session.add(question)
         session.flush()
@@ -147,7 +147,7 @@ def test_attempt_history_returns_data():
     assert len(payload) == 1
     entry = payload[0]
     assert entry["quiz_title"] == "Sample Quiz"
-    assert entry["category_name"] == "General Knowledge"
+    assert entry["subject_name"] == "General Knowledge"
     assert entry["difficulty"] == "Easy"
     assert entry["total_questions"] == 1
     assert entry["correct_answers"] == 1

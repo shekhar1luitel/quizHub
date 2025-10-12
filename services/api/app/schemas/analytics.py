@@ -14,8 +14,8 @@ class OverallStats(BaseModel):
     streak: int
 
 
-class CategoryPerformance(BaseModel):
-    category: str
+class SubjectPerformance(BaseModel):
+    subject: str
     tests: int
     average_score: float
     best_score: float
@@ -39,7 +39,7 @@ class TimeAnalysis(BaseModel):
 class AnalyticsOverview(BaseModel):
     generated_at: datetime
     overall_stats: OverallStats
-    category_performance: List[CategoryPerformance]
+    subject_performance: List[SubjectPerformance]
     weekly_progress: List[WeeklyProgressEntry]
     time_analysis: Optional[TimeAnalysis]
     strengths: List[str]

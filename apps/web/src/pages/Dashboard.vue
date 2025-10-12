@@ -11,9 +11,9 @@ interface AttemptSummary {
   submitted_at: string
 }
 
-interface CategoryAccuracy {
-  category_id: number | null
-  category_name: string
+interface SubjectAccuracy {
+  subject_id: number | null
+  subject_name: string
   attempts: number
   average_score: number
 }
@@ -30,7 +30,7 @@ interface DashboardSummary {
   total_questions_answered: number
   recent_attempts: AttemptSummary[]
   streak: number
-  category_accuracy: CategoryAccuracy[]
+  subject_accuracy: SubjectAccuracy[]
   weekly_activity: WeeklyActivityEntry[]
 }
 
@@ -64,14 +64,14 @@ const streakLabel = computed(() => {
   return `${value} days`
 })
 
-const topCategories = computed(() => {
+const topSubjects = computed(() => {
   if (!summary.value) return []
-  return summary.value.category_accuracy.slice(0, 5)
+  return summary.value.subject_accuracy.slice(0, 5)
 })
 
 const weeklyActivity = computed(() => summary.value?.weekly_activity ?? [])
 const hasWeeklyActivity = computed(() => weeklyActivity.value.length > 0)
-const hasCategoryData = computed(() => topCategories.value.length > 0)
+const hasSubjectData = computed(() => topSubjects.value.length > 0)
 
 const scoreClass = (score: number) => {
   if (score >= 80) return 'text-emerald-600'
@@ -177,32 +177,32 @@ onMounted(loadDashboard)
           <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <header class="flex items-center justify-between">
               <div>
-                <h2 class="text-base font-semibold text-slate-900">Category performance</h2>
+                <h2 class="text-base font-semibold text-slate-900">Subject performance</h2>
                 <p class="text-xs text-slate-500">Spot your strongest and weakest areas.</p>
               </div>
             </header>
-            <p v-if="!hasCategoryData" class="mt-4 text-sm text-slate-500">
-              Attempt a few quizzes to unlock category-level insights.
+            <p v-if="!hasSubjectData" class="mt-4 text-sm text-slate-500">
+              Attempt a few quizzes to unlock subject-level insights.
             </p>
             <ul v-else class="mt-4 space-y-3 text-sm">
               <li
-                v-for="category in topCategories"
-                :key="`${category.category_id ?? 'general'}-${category.category_name}`"
+                v-for="subject in topSubjects"
+                :key="`${subject.subject_id ?? 'general'}-${subject.subject_name}`"
                 class="rounded-2xl border border-slate-200 p-4"
               >
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="font-semibold text-slate-900">{{ category.category_name }}</p>
-                    <p class="text-xs text-slate-500">{{ category.attempts }} sessions</p>
+                    <p class="font-semibold text-slate-900">{{ subject.subject_name }}</p>
+                    <p class="text-xs text-slate-500">{{ subject.attempts }} sessions</p>
                   </div>
-                  <span :class="['text-sm font-semibold', scoreClass(category.average_score)]">
-                    {{ category.average_score.toFixed(1) }}%
+                  <span :class="['text-sm font-semibold', scoreClass(subject.average_score)]">
+                    {{ subject.average_score.toFixed(1) }}%
                   </span>
                 </div>
                 <div class="mt-3 h-2 rounded-full bg-slate-100">
                   <div
                     class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-                    :style="{ width: progressWidth(category.average_score) }"
+                    :style="{ width: progressWidth(subject.average_score) }"
                   />
                 </div>
               </li>

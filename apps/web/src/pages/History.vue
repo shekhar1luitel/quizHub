@@ -16,8 +16,8 @@ interface AttemptHistoryEntryResponse {
   correct_answers: number
   score: number
   duration_seconds: number
-  category_id: number | null
-  category_name: string | null
+  subject_id: number | null
+  subject_name: string | null
   difficulty: string | null
   type: string
 }
@@ -26,8 +26,8 @@ interface HistoryEntry {
   id: number
   quizId: number | null
   title: string
-  category: string
-  categoryId: number | null
+  subject: string
+  subjectId: number | null
   score: number
   totalQuestions: number
   correctAnswers: number
@@ -38,7 +38,7 @@ interface HistoryEntry {
 }
 
 const searchTerm = ref('')
-const selectedCategory = ref('All')
+const selectedSubject = ref('All')
 const selectedType = ref<'All' | AttemptType>('All')
 const sortBy = ref<'date' | 'score' | 'title'>('date')
 
@@ -46,7 +46,7 @@ const loading = ref(true)
 const error = ref('')
 const history = ref<HistoryEntry[]>([])
 
-const DEFAULT_CATEGORY = 'General Practice'
+const DEFAULT_SUBJECT = 'General Practice'
 
 const mapType = (value: string | undefined): AttemptType => {
   if (value === 'practice' || value === 'mock') return value
@@ -71,8 +71,8 @@ const loadHistory = async () => {
       id: entry.id,
       quizId: entry.quiz_id ?? null,
       title: entry.quiz_title,
-      category: entry.category_name?.trim() || DEFAULT_CATEGORY,
-      categoryId: entry.category_id ?? null,
+      subject: entry.subject_name?.trim() || DEFAULT_SUBJECT,
+      subjectId: entry.subject_id ?? null,
       score: Number(entry.score ?? 0),
       totalQuestions: entry.total_questions,
       correctAnswers: entry.correct_answers,
@@ -92,16 +92,16 @@ const loadHistory = async () => {
 
 onMounted(loadHistory)
 
-const categories = computed(() => ['All', ...new Set(history.value.map((item) => item.category))])
+const subjects = computed(() => ['All', ...new Set(history.value.map((item) => item.subject))])
 
 const filteredHistory = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
   return history.value
     .filter((item) => {
       const matchesSearch = !term || item.title.toLowerCase().includes(term)
-      const matchesCategory = selectedCategory.value === 'All' || item.category === selectedCategory.value
+      const matchesSubject = selectedSubject.value === 'All' || item.subject === selectedSubject.value
       const matchesType = selectedType.value === 'All' || item.type === selectedType.value
-      return matchesSearch && matchesCategory && matchesType
+      return matchesSearch && matchesSubject && matchesType
     })
     .sort((a, b) => {
       switch (sortBy.value) {
@@ -244,10 +244,10 @@ const typeBadge = (type: AttemptType) => {
             class="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
           />
           <select
-            v-model="selectedCategory"
+            v-model="selectedSubject"
             class="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
-            <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
+            <option v-for="subject in subjects" :key="subject" :value="subject">{{ subject }}</option>
           </select>
           <select
             v-model="selectedType"
@@ -287,7 +287,7 @@ const typeBadge = (type: AttemptType) => {
               <h3 class="text-lg font-semibold text-slate-900">{{ entry.title }}</h3>
               <p class="text-xs text-slate-500">{{ formatDate(entry.date) }} · {{ entry.totalQuestions }} questions</p>
               <div class="flex flex-wrap gap-2 text-xs">
-                <span class="rounded-full border border-slate-200 px-3 py-1 text-slate-600">{{ entry.category }}</span>
+                <span class="rounded-full border border-slate-200 px-3 py-1 text-slate-600">{{ entry.subject }}</span>
                 <span :class="['rounded-full border px-3 py-1', typeBadge(entry.type)]">
                   {{ entry.type === 'mock' ? 'Mock test' : entry.type === 'practice' ? 'Practice set' : 'Quiz' }}
                 </span>

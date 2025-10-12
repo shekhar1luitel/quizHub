@@ -11,7 +11,7 @@ class AdminTotals(BaseModel):
     active_quizzes: int
     total_questions: int
     inactive_questions: int
-    total_categories: int
+    total_subjects: int
     total_users: int
 
 
@@ -23,7 +23,7 @@ class AdminRecentQuiz(BaseModel):
     created_at: datetime
 
 
-class AdminCategorySnapshot(BaseModel):
+class AdminSubjectSnapshot(BaseModel):
     id: int
     name: str
     question_count: int
@@ -32,4 +32,4 @@ class AdminCategorySnapshot(BaseModel):
 class AdminOverview(BaseModel):
     totals: AdminTotals
     recent_quizzes: List[AdminRecentQuiz]
-    top_categories: List[AdminCategorySnapshot]
+    top_subjects: List[AdminSubjectSnapshot]

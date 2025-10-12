@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class PracticeCategorySummary(BaseModel):
+class PracticeSubjectSummary(BaseModel):
     slug: str
     name: str
     description: Optional[str]
@@ -39,7 +39,7 @@ class PracticeQuestion(BaseModel):
     }
 
 
-class PracticeCategoryDetail(BaseModel):
+class PracticeSubjectDetail(BaseModel):
     slug: str
     name: str
     description: Optional[str]

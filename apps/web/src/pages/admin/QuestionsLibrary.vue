@@ -7,12 +7,12 @@ import { http } from '../../api/http'
 interface QuestionSummary {
   id: number
   prompt: string
-  subject?: string | null
+  subject_label?: string | null
   difficulty?: string | null
   is_active: boolean
   option_count: number
-  category_id: number
-  category_name: string
+  subject_id: number
+  subject_name: string
 }
 
 const router = useRouter()
@@ -45,8 +45,8 @@ const filteredQuestions = computed(() => {
     const matchesSearch =
       !term ||
       question.prompt.toLowerCase().includes(term) ||
-      question.category_name.toLowerCase().includes(term) ||
-      question.subject?.toLowerCase().includes(term) ||
+      question.subject_name.toLowerCase().includes(term) ||
+      question.subject_label?.toLowerCase().includes(term) ||
       question.difficulty?.toLowerCase().includes(term)
     return matchesStatus && matchesSearch
   })
@@ -161,7 +161,7 @@ loadQuestions()
             <input
               v-model="searchTerm"
               type="search"
-              placeholder="Search text, subject, difficulty, or category"
+              placeholder="Search text, subject, difficulty, or subject"
               class="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
             />
           </div>
@@ -208,10 +208,10 @@ loadQuestions()
               <div class="space-y-3">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
                   <span class="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-600">
-                    {{ question.category_name }}
+                    {{ question.subject_name }}
                   </span>
                   <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
-                    {{ question.subject || 'General' }}
+                    {{ question.subject_label || 'General' }}
                   </span>
                   <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
                     {{ question.difficulty || 'Unrated' }}

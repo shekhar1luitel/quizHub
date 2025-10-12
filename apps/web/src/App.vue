@@ -76,9 +76,9 @@ const exploreLinks = computed<SidebarLink[]>(() => {
     `,
   }
 
-  const categoriesLink: SidebarLink = {
-    label: 'Categories',
-    to: { name: 'categories' },
+  const subjectsLink: SidebarLink = {
+    label: 'Subjects',
+    to: { name: 'subjects' },
     icon: `
       <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 3.75h6.75v6.75H4.5zM12.75 13.5H19.5v6.75h-6.75zM12.75 3.75h6.75v6.75h-6.75zM4.5 13.5h6.75v6.75H4.5z" />
     `,
@@ -95,9 +95,9 @@ const exploreLinks = computed<SidebarLink[]>(() => {
   const links: SidebarLink[] = [homeLink]
 
   if (auth.isLearner) {
-    links.push(quizSetupLink, categoriesLink, bookmarksLink)
+    links.push(quizSetupLink, subjectsLink, bookmarksLink)
   } else if (!auth.isAuthenticated) {
-    links.push(categoriesLink)
+    links.push(subjectsLink)
   }
 
   return links
@@ -243,21 +243,21 @@ const adminMenuLinks = computed<SidebarLink[]>(() => {
       ],
     },
     {
-      label: 'Categories',
+      label: 'Subjects',
       icon: `
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6v6h-6zM13.5 5.25h6v6h-6zM13.5 14.25h6v6h-6zM4.5 14.25h6v6h-6z" />
       `,
       children: [
         {
-          label: 'Manage categories',
-          to: { name: 'admin-categories' },
+          label: 'Manage subjects',
+          to: { name: 'admin-subjects' },
           icon: `
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5zM12.75 6.75H19.5v6.75h-6.75zM4.5 15.75h6.75v6.75H4.5zM12.75 15.75H19.5v6.75h-6.75z" />
           `,
         },
         {
-          label: 'Category list',
-          to: { name: 'admin-category-library' },
+          label: 'Subject list',
+          to: { name: 'admin-subject-library' },
           icon: `
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h6v6h-6zM13.5 5.25h6v6h-6zM13.5 14.25h6v6h-6zM4.5 14.25h6v6h-6z" />
           `,
@@ -911,10 +911,10 @@ watch(
           <div class="flex items-center gap-3 text-slate-400">
             <RouterLink :to="{ name: 'home' }" class="transition hover:text-brand-600">Home</RouterLink>
             <RouterLink
-              :to="{ name: 'categories' }"
+              :to="{ name: 'subjects' }"
               class="transition hover:text-brand-600"
             >
-              Categories
+              Subjects
             </RouterLink>
             <RouterLink
               v-if="auth.isAuthenticated"

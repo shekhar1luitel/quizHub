@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user, get_db_session
 from app.models.bookmark import Bookmark
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Question
 from app.models.user import User
 from app.schemas.bookmark import BookmarkCreate, BookmarkOut
@@ -16,16 +16,16 @@ from app.schemas.bookmark import BookmarkCreate, BookmarkOut
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
 
-def _bookmark_to_out(bookmark: Bookmark, question: Question, category: Category) -> BookmarkOut:
+def _bookmark_to_out(bookmark: Bookmark, question: Question, subject: Subject) -> BookmarkOut:
     return BookmarkOut(
         id=bookmark.id,
         question_id=bookmark.question_id,
         created_at=bookmark.created_at,
         prompt=question.prompt,
-        subject=question.subject,
+        subject=question.subject_label,
         difficulty=question.difficulty,
-        category_id=category.id,
-        category_name=category.name,
+        subject_id=subject.id,
+        subject_name=subject.name,
     )
 
 
@@ -37,7 +37,7 @@ def list_bookmarks(
     stmt = (
         select(Bookmark)
         .options(
-            joinedload(Bookmark.question).joinedload(Question.category)
+            joinedload(Bookmark.question).joinedload(Question.subject)
         )
         .where(Bookmark.user_id == current_user.id)
         .order_by(Bookmark.created_at.desc())
@@ -46,13 +46,13 @@ def list_bookmarks(
     results: List[BookmarkOut] = []
     for bookmark in bookmarks:
         question = bookmark.question
-        category = question.category
-        if category is None:
+        subject = question.subject
+        if subject is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Bookmark is missing category information",
+                detail="Bookmark is missing subject information",
             )
-        results.append(_bookmark_to_out(bookmark, question, category))
+        results.append(_bookmark_to_out(bookmark, question, subject))
     return results
 
 
@@ -73,16 +73,16 @@ def create_bookmark(
 ) -> BookmarkOut:
     question = (
         db.query(Question)
-        .options(joinedload(Question.category))
+        .options(joinedload(Question.subject))
         .filter(Question.id == payload.question_id)
         .first()
     )
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
-    if question.category is None:
+    if question.subject is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Question is missing category",
+            detail="Question is missing subject",
         )
 
     bookmark = (
@@ -98,7 +98,7 @@ def create_bookmark(
     else:
         db.refresh(bookmark)
 
-    return _bookmark_to_out(bookmark, question, question.category)
+    return _bookmark_to_out(bookmark, question, question.subject)
 
 
 @router.delete("/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
