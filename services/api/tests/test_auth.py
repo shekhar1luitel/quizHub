@@ -15,7 +15,12 @@ from app.models.user import PlatformUser, User
 
 
 engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+    bind=engine,
+)
 Base.metadata.create_all(bind=engine)
 
 

@@ -22,7 +22,12 @@ from app.models.user import LearnerUser, User  # noqa: E402
 
 
 engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+    bind=engine,
+)
 Base.metadata.create_all(bind=engine)
 
 
@@ -194,6 +199,11 @@ def seed_global_questions(db: Session) -> Category:
 
 
 def seed_questions_without_items(db: Session) -> tuple[Organization, Category]:
+    db.query(QuizQuestion).delete()
+    db.query(Quiz).delete()
+    db.query(OrgMembership).delete()
+    db.query(LearnerUser).delete()
+    db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
     db.query(Category).delete()
