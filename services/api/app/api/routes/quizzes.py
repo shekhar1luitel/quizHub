@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -39,7 +41,7 @@ def _resolve_default_org_id(user: User) -> int | None:
 
 @router.get("/", response_model=List[QuizSummary])
 def list_quizzes(
-    organization_id: int | None = Query(default=None),
+    organization_id: Annotated[int | None, Query(ge=1)] = None,
     db: Session = Depends(get_db_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> List[QuizSummary]:

@@ -203,8 +203,8 @@ def get_practice_category(
 @router.get("/bookmarks", response_model=PracticeCategoryDetail)
 def get_bookmark_revision_set(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    difficulty: str | None = Query(default=None, min_length=1, max_length=50),
-    category_id: int | None = Query(default=None, ge=1),
+    difficulty: Annotated[str | None, Query(min_length=1, max_length=50)] = None,
+    category_id: Annotated[int | None, Query(ge=1)] = None,
     current_user: User = Depends(require_learner),
     db: Session = Depends(get_db_session),
 ) -> PracticeCategoryDetail:
