@@ -48,7 +48,7 @@ Open: [http://localhost:8000/health](http://localhost:8000/health)
 ## 3) Frontend setup
 
 ```bash
-cd apps/web
+cd app/web
 cp .env.example .env  # if you create one; or set VITE_API_URL if needed
 npm i
 npm run dev

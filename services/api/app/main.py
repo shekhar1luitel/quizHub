@@ -15,6 +15,7 @@ from app.api.routes.quizzes import router as quizzes_router
 from app.api.routes.users import router as users_router
 from app.api.routes.notifications import router as notifications_router
 from app.api.routes.organizations import router as organizations_router
+from app.api.routes.public import router as public_router
 
 app = FastAPI(title="Loksewa Quiz Hub API", version="0.1.0")
 
@@ -40,3 +41,4 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(organizations_router, prefix="/api")
+app.include_router(public_router, prefix="/api")

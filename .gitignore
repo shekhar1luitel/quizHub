@@ -30,10 +30,10 @@ pip-wheel-metadata/
 services/api/alembic/versions/*.pyc
 
 # Node / Vite
-apps/web/node_modules/
-apps/web/dist/
-apps/web/.vite/
-apps/web/.eslintcache
+app/web/node_modules/
+app/web/dist/
+app/web/.vite/
+app/web/.eslintcache
 
 # IDE / Editor
 .idea/
