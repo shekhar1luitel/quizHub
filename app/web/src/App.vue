@@ -1,21 +1,21 @@
 <template>
   <main class="app-shell">
     <header class="hero">
-      <p class="eyebrow">QuizHub insight</p>
-      <h1>Your learning launchpad</h1>
+      <p class="eyebrow">QuizHub platform</p>
+      <h1>Unified API control center</h1>
       <p>
-        Explore categories curated by QuizHub, keep an eye on trending quizzes, and jump back
-        into practice whenever you're ready.
+        Inspect, filter, and interact with every backend endpoint exposed by QuizHub. Configure
+        payloads, set headers, and validate responses without leaving this workspace.
       </p>
     </header>
     <section class="content">
-      <PublicHome />
+      <ApiExplorer />
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import PublicHome from './components/PublicHome.vue'
+import ApiExplorer from './components/ApiExplorer.vue'
 </script>
 
 <style scoped>
@@ -54,7 +54,7 @@ import PublicHome from './components/PublicHome.vue'
 .hero p {
   margin: 0;
   font-size: clamp(1rem, 2vw, 1.2rem);
-  max-width: 48rem;
+  max-width: 52rem;
   color: rgba(255, 255, 255, 0.92);
 }
 
