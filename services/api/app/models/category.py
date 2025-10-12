@@ -26,6 +26,9 @@ class Category(Base):
     questions: Mapped[list["Question"]] = relationship(
         "Question", back_populates="category"
     )
+    topics: Mapped[list["Topic"]] = relationship(
+        "Topic", back_populates="subject", cascade="all, delete-orphan", order_by="Topic.name"
+    )
     organization: Mapped["Organization | None"] = relationship(
         "Organization", back_populates="categories"
     )

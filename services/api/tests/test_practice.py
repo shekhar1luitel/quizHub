@@ -18,6 +18,7 @@ from app.models.category import Category  # noqa: E402
 from app.models.organization import Organization, OrgMembership  # noqa: E402
 from app.models.question import Option, Question, QuizQuestion  # noqa: E402
 from app.models.quiz import Quiz  # noqa: E402
+from app.models.topic import Topic  # noqa: E402
 from app.models.user import LearnerUser, User  # noqa: E402
 
 
@@ -39,6 +40,7 @@ def seed_questions(db: Session) -> Organization:
     db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
+    db.query(Topic).delete()
     db.query(Category).delete()
     db.query(Organization).delete()
 
@@ -57,6 +59,16 @@ def seed_questions(db: Session) -> Organization:
     db.add(category)
     db.flush()
 
+    topic = Topic(
+        subject_id=category.id,
+        name="World Facts",
+        slug="world-facts",
+        description="Explore world trivia",
+    )
+
+    db.add(topic)
+    db.flush()
+
     general_question = Question(
         prompt="Capital of Nepal is Kathmandu.",
         explanation="Kathmandu is the capital city of Nepal.",
@@ -64,6 +76,7 @@ def seed_questions(db: Session) -> Organization:
         difficulty="Easy",
         is_active=True,
         category_id=category.id,
+        topic_id=topic.id,
         organization_id=organization.id,
     )
     mixed_question = Question(
@@ -73,6 +86,7 @@ def seed_questions(db: Session) -> Organization:
         difficulty="Medium",
         is_active=True,
         category_id=category.id,
+        topic_id=topic.id,
         organization_id=organization.id,
     )
 
@@ -148,6 +162,7 @@ def seed_global_questions(db: Session) -> Category:
     db.query(User).delete()
     db.query(Option).delete()
     db.query(Question).delete()
+    db.query(Topic).delete()
     db.query(Category).delete()
     db.query(Organization).delete()
 
@@ -161,6 +176,15 @@ def seed_global_questions(db: Session) -> Category:
     db.add(category)
     db.flush()
 
+    topic = Topic(
+        subject_id=category.id,
+        name="World Facts",
+        slug="world-facts",
+        description="Explore world trivia",
+    )
+    db.add(topic)
+    db.flush()
+
     general_question = Question(
         prompt="Capital of Nepal is Kathmandu.",
         explanation="Kathmandu is the capital city of Nepal.",
@@ -168,6 +192,7 @@ def seed_global_questions(db: Session) -> Category:
         difficulty="Easy",
         is_active=True,
         category_id=category.id,
+        topic_id=topic.id,
         organization_id=None,
     )
     mixed_question = Question(
@@ -177,6 +202,7 @@ def seed_global_questions(db: Session) -> Category:
         difficulty="Medium",
         is_active=True,
         category_id=category.id,
+        topic_id=topic.id,
         organization_id=None,
     )
     db.add_all([general_question, mixed_question])
@@ -239,6 +265,7 @@ def test_practice_categories_reflect_active_questions():
     assert general.difficulty == "Mixed"
     assert general.icon == "🌍"
     assert general.description is not None
+    assert [topic.slug for topic in general.topics] == ["world-facts"]
 
 
 def test_practice_categories_include_quiz_id_when_available():
@@ -283,6 +310,7 @@ def test_practice_category_detail_returns_questions():
     assert detail.icon == "🌍"
     assert all(len(question.options) == 4 for question in detail.questions)
     assert any(option.is_correct for option in detail.questions[0].options)
+    assert [topic.slug for topic in detail.topics] == ["world-facts"]
 
 
 def test_practice_category_without_questions_returns_empty_list():
@@ -312,6 +340,7 @@ def test_practice_categories_support_global_scope():
     summary = next(item for item in categories if item.slug == category.slug)
     assert summary.total_questions == 2
     assert summary.organization_id is None
+    assert [topic.slug for topic in summary.topics] == ["world-facts"]
 
 
 def test_practice_category_detail_global_scope():
@@ -327,6 +356,7 @@ def test_practice_category_detail_global_scope():
     assert detail.organization_id is None
     assert detail.total_questions == 2
     assert len(detail.questions) == 2
+    assert [topic.slug for topic in detail.topics] == ["world-facts"]
 
 
 def test_practice_bookmarks_returns_questions():

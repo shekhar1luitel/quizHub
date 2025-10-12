@@ -15,6 +15,7 @@ from app.api.deps import (
 )
 from app.models.category import Category
 from app.models.question import Option, Question
+from app.models.topic import Topic
 from app.models.user import User
 from app.schemas.question import OptionCreate, QuestionCreate, QuestionOut, QuestionSummary, QuestionUpdate
 
@@ -51,10 +52,13 @@ def list_questions(
             Question.category_id,
             Question.organization_id,
             Category.name.label("category_name"),
+            Question.topic_id,
+            Topic.name.label("topic_name"),
             func.count(Option.id).label("option_count"),
         )
         .join(Category, Category.id == Question.category_id)
         .join(Option, Option.question_id == Question.id)
+        .join(Topic, Topic.id == Question.topic_id, isouter=True)
         .group_by(
             Question.id,
             Question.prompt,
@@ -64,6 +68,8 @@ def list_questions(
             Question.category_id,
             Question.organization_id,
             Category.name,
+            Question.topic_id,
+            Topic.name,
         )
         .order_by(Question.id.desc())
     )
@@ -85,6 +91,8 @@ def list_questions(
             category_id=row.category_id,
             category_name=row.category_name,
             organization_id=row.organization_id,
+            topic_id=row.topic_id,
+            topic_name=row.topic_name,
         )
         for row in rows
     ]
@@ -99,7 +107,11 @@ def get_question(
 ) -> QuestionOut:
     question = (
         db.query(Question)
-        .options(selectinload(Question.options), selectinload(Question.category))
+        .options(
+            selectinload(Question.options),
+            selectinload(Question.category),
+            selectinload(Question._topic),
+        )
         .filter(Question.id == question_id)
         .first()
     )
@@ -118,6 +130,22 @@ def get_question(
     return QuestionOut.model_validate(question)
 
 
+def _ensure_topic_for_subject(
+    db: Session,
+    topic_id: int | None,
+    subject_id: int,
+) -> Topic | None:
+    if topic_id is None:
+        return None
+    topic = db.get(Topic, topic_id)
+    if topic is None or topic.subject_id != subject_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selected topic does not belong to the subject.",
+        )
+    return topic
+
+
 @router.post("/", response_model=QuestionOut, status_code=status.HTTP_201_CREATED)
 def create_question(
     payload: QuestionCreate,
@@ -132,6 +160,7 @@ def create_question(
         allow_global_for_admin=True,
     )
     category = _ensure_category_exists(db, payload.category_id, target_org_id, current_user)
+    topic = _ensure_topic_for_subject(db, payload.topic_id, category.id)
 
     question = Question(
         prompt=payload.prompt,
@@ -140,6 +169,7 @@ def create_question(
         difficulty=payload.difficulty,
         is_active=payload.is_active,
         category_id=payload.category_id,
+        topic_id=topic.id if topic is not None else None,
         organization_id=target_org_id if target_org_id is not None else category.organization_id,
     )
     db.add(question)
@@ -194,6 +224,17 @@ def update_question(
         category = _ensure_category_exists(db, payload.category_id, target_org_id, current_user)
         question.category_id = payload.category_id
         question.organization_id = target_org_id if target_org_id is not None else category.organization_id
+        if question.topic_id is not None:
+            current_topic = db.get(Topic, question.topic_id)
+            if current_topic is None or current_topic.subject_id != question.category_id:
+                question.topic_id = None
+
+    if "topic_id" in payload.model_fields_set:
+        if payload.topic_id is None:
+            question.topic_id = None
+        else:
+            topic = _ensure_topic_for_subject(db, payload.topic_id, question.category_id)
+            question.topic_id = topic.id
 
     if payload.options is not None:
         validate_options(payload.options)

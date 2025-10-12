@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from app.schemas.topic import TopicOut
 
 class PublicCategorySummary(BaseModel):
     slug: str
@@ -13,6 +14,7 @@ class PublicCategorySummary(BaseModel):
     icon: Optional[str]
     total_questions: int
     difficulty: str
+    topics: List[TopicOut] = []
 
 
 class PublicQuizSummary(BaseModel):
