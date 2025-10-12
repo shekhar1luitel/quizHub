@@ -9,12 +9,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db_session, require_learner
 from app.models.attempt import Attempt, AttemptAnswer
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.question import Question
 from app.models.user import User
 from app.schemas.dashboard import (
     AttemptSummary,
-    CategoryAccuracy,
+    SubjectAccuracy,
     DashboardSummary,
     WeeklyActivityEntry,
 )
@@ -79,27 +79,27 @@ def get_dashboard_summary(
         for bucket_date, count in sorted(weekly_map.items())
     ]
 
-    category_accuracy: list[CategoryAccuracy] = []
+    subject_accuracy: list[SubjectAccuracy] = []
     attempt_ids = [attempt.id for attempt in attempts]
     if attempt_ids:
         rows = db.execute(
             select(
-                Question.category_id.label("category_id"),
+                Question.subject_id.label("subject_id"),
                 func.count(func.distinct(AttemptAnswer.attempt_id)).label("attempts"),
                 func.count(AttemptAnswer.id).label("answered"),
                 func.sum(case((AttemptAnswer.is_correct.is_(True), 1), else_=0)).label("correct"),
             )
             .join(Question, Question.id == AttemptAnswer.question_id)
             .where(AttemptAnswer.attempt_id.in_(attempt_ids))
-            .group_by(Question.category_id)
+            .group_by(Question.subject_id)
         ).all()
 
-        category_ids = [row.category_id for row in rows if row.category_id is not None]
-        category_lookup = {}
-        if category_ids:
-            category_lookup = dict(
+        subject_ids = [row.subject_id for row in rows if row.subject_id is not None]
+        subject_lookup = {}
+        if subject_ids:
+            subject_lookup = dict(
                 db.execute(
-                    select(Category.id, Category.name).where(Category.id.in_(category_ids))
+                    select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
                 ).all()
             )
 
@@ -109,23 +109,23 @@ def get_dashboard_summary(
             correct = int(row.correct or 0)
             if answered == 0:
                 continue
-            category_id = row.category_id
-            category_name = (
-                category_lookup.get(category_id)
-                if category_id is not None
+            subject_id = row.subject_id
+            subject_name = (
+                subject_lookup.get(subject_id)
+                if subject_id is not None
                 else "General Practice"
             )
             average = (correct / answered) * 100 if answered else 0.0
-            category_accuracy.append(
-                CategoryAccuracy(
-                    category_id=category_id,
-                    category_name=category_name or "General Practice",
+            subject_accuracy.append(
+                SubjectAccuracy(
+                    subject_id=subject_id,
+                    subject_name=subject_name or "General Practice",
                     attempts=attempts_count,
                     average_score=round(average, 2),
                 )
             )
 
-        category_accuracy.sort(key=lambda entry: entry.average_score, reverse=True)
+        subject_accuracy.sort(key=lambda entry: entry.average_score, reverse=True)
 
     return DashboardSummary(
         total_attempts=total_attempts,
@@ -143,6 +143,6 @@ def get_dashboard_summary(
             for attempt in recent_attempts
         ],
         streak=streak,
-        category_accuracy=category_accuracy,
+        subject_accuracy=subject_accuracy,
         weekly_activity=weekly_activity[-12:],
     )

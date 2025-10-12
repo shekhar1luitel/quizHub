@@ -60,8 +60,8 @@ class AttemptHistoryEntry(BaseModel):
     correct_answers: int
     score: float
     duration_seconds: int
-    category_id: Optional[int] = None
-    category_name: Optional[str] = None
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
     difficulty: str
     type: str = "quiz"
 

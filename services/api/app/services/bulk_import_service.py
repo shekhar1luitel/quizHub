@@ -15,7 +15,7 @@ class BulkImportFormatError(ValueError):
 
 
 @dataclass
-class ParsedCategory:
+class ParsedSubject:
     source_row: int
     name: str
     description: str | None
@@ -44,10 +44,10 @@ class ParsedQuestion:
     source_row: int
     prompt: str
     explanation: str | None
-    subject: str | None
+    subject_label: str | None
     difficulty: str | None
     is_active: bool
-    category_name: str
+    subject_name: str
     quiz_titles: List[str]
     options: List[ParsedQuestionOption]
     errors: List[str] = field(default_factory=list)
@@ -55,14 +55,14 @@ class ParsedQuestion:
 
 @dataclass
 class ParsedWorkbook:
-    categories: List[ParsedCategory]
+    subjects: List[ParsedSubject]
     quizzes: List[ParsedQuiz]
     questions: List[ParsedQuestion]
     warnings: List[str] = field(default_factory=list)
 
 
 @dataclass
-class ExportCategory:
+class ExportSubject:
     name: str
     description: str | None
     icon: str | None
@@ -86,15 +86,15 @@ class ExportQuestionOption:
 class ExportQuestion:
     prompt: str
     explanation: str | None
-    subject: str | None
+    subject_label: str | None
     difficulty: str | None
     is_active: bool
-    category_name: str
+    subject_name: str
     quiz_titles: List[str]
     options: List[ExportQuestionOption]
 
 
-_CATEGORY_SHEET_NAMES = {"categories", "category", "category setup"}
+_SUBJECT_SHEET_NAMES = {"subjects", "subject", "subject setup"}
 _QUIZ_SHEET_NAMES = {"quizzes", "quiz", "quiz setup"}
 _QUESTION_SHEET_NAMES = {"questions", "question bank", "items"}
 
@@ -110,24 +110,24 @@ def parse_workbook(file_bytes: bytes) -> ParsedWorkbook:
     except (BadZipFile, KeyError, ET.ParseError) as exc:  # noqa: BLE001
         raise BulkImportFormatError("Unable to read the Excel workbook. Upload a valid .xlsx file.") from exc
 
-    categories_sheet = _locate_sheet(sheet_map.keys(), _CATEGORY_SHEET_NAMES)
+    subjects_sheet = _locate_sheet(sheet_map.keys(), _SUBJECT_SHEET_NAMES)
     quizzes_sheet = _locate_sheet(sheet_map.keys(), _QUIZ_SHEET_NAMES)
     questions_sheet = _locate_sheet(sheet_map.keys(), _QUESTION_SHEET_NAMES)
 
     warnings: List[str] = []
-    if categories_sheet is None:
-        warnings.append("Categories sheet not found. Expected a sheet named 'Categories'.")
+    if subjects_sheet is None:
+        warnings.append("Subjects sheet not found. Expected a sheet named 'Subjects'.")
     if quizzes_sheet is None:
         warnings.append("Quizzes sheet not found. Expected a sheet named 'Quizzes'.")
     if questions_sheet is None:
         warnings.append("Questions sheet not found. Expected a sheet named 'Questions'.")
 
-    categories = _parse_categories(sheet_map[categories_sheet]) if categories_sheet else []
+    subjects = _parse_subjects(sheet_map[subjects_sheet]) if subjects_sheet else []
     quizzes = _parse_quizzes(sheet_map[quizzes_sheet]) if quizzes_sheet else []
     questions = _parse_questions(sheet_map[questions_sheet]) if questions_sheet else []
 
     return ParsedWorkbook(
-        categories=categories,
+        subjects=subjects,
         quizzes=quizzes,
         questions=questions,
         warnings=warnings,
@@ -148,35 +148,35 @@ def _normalize_sheet_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", normalized)
 
 
-def _parse_categories(rows: List[List[Any]]) -> List[ParsedCategory]:
+def _parse_subjects(rows: List[List[Any]]) -> List[ParsedSubject]:
     headers = _extract_headers(rows)
-    categories: List[ParsedCategory] = []
+    subjects: List[ParsedSubject] = []
     for row_idx, values in _iter_rows(rows):
         row_map = _row_to_map(headers, values)
-        name = _normalize_str(_pick(row_map, ["name", "category", "category name"]))
+        name = _normalize_str(_pick(row_map, ["name", "subject", "subject name"]))
         description = _normalize_str(_pick(row_map, ["description", "details", "summary"]))
         icon = _normalize_str(_pick(row_map, ["icon", "emoji"]))
         if not name:
             if not _is_empty_row(values):
-                categories.append(
-                    ParsedCategory(
+                subjects.append(
+                    ParsedSubject(
                         source_row=row_idx,
                         name="",
                         description=None,
                         icon=None,
-                        errors=["Category name is required."],
+                        errors=["Subject name is required."],
                     )
                 )
             continue
-        categories.append(
-            ParsedCategory(
+        subjects.append(
+            ParsedSubject(
                 source_row=row_idx,
                 name=name,
                 description=description,
                 icon=icon,
             )
         )
-    return categories
+    return subjects
 
 
 def _parse_quizzes(rows: List[List[Any]]) -> List[ParsedQuiz]:
@@ -226,7 +226,7 @@ def _parse_questions(rows: List[List[Any]]) -> List[ParsedQuestion]:
         subject = _normalize_str(_pick(row_map, ["subject", "topic"]))
         difficulty = _normalize_str(_pick(row_map, ["difficulty", "level"]))
         is_active = _parse_bool(_pick(row_map, ["is active", "active", "status"]), default=True)
-        category_name = _normalize_str(_pick(row_map, ["category", "category name"]))
+        subject_name = _normalize_str(_pick(row_map, ["subject", "subject name"]))
         quiz_titles = _split_list(_pick(row_map, ["quizzes", "quiz titles", "assign to quizzes"]))
 
         option_pairs = _extract_options(headers, values)
@@ -238,8 +238,8 @@ def _parse_questions(rows: List[List[Any]]) -> List[ParsedQuestion]:
             if _is_empty_row(values):
                 continue
             errors.append("Question prompt is required.")
-        if not category_name:
-            errors.append("Category name is required for each question.")
+        if not subject_name:
+            errors.append("Subject name is required for each question.")
         if len(options) < 2:
             errors.append("Provide at least two options.")
         elif not any(option.is_correct for option in options):
@@ -256,7 +256,7 @@ def _parse_questions(rows: List[List[Any]]) -> List[ParsedQuestion]:
                 subject=subject,
                 difficulty=difficulty,
                 is_active=is_active,
-                category_name=category_name or "",
+                subject_name=subject_name or "",
                 quiz_titles=quiz_titles,
                 options=options,
                 errors=errors,
@@ -517,8 +517,8 @@ def _column_index(cell_ref: str | None) -> int:
 
 
 def build_bulk_import_template() -> bytes:
-    sample_categories = [
-        ExportCategory(name="General Knowledge", description="Mixed trivia sample", icon="sparkles"),
+    sample_subjects = [
+        ExportSubject(name="General Knowledge", description="Mixed trivia sample", icon="sparkles"),
     ]
     sample_quizzes = [
         ExportQuiz(
@@ -535,7 +535,7 @@ def build_bulk_import_template() -> bytes:
             subject="Mathematics",
             difficulty="Easy",
             is_active=True,
-            category_name="General Knowledge",
+            subject_name="General Knowledge",
             quiz_titles=["General Quiz"],
             options=[
                 ExportQuestionOption(text="4", is_correct=True),
@@ -545,20 +545,20 @@ def build_bulk_import_template() -> bytes:
             ],
         )
     ]
-    return build_bulk_import_workbook(sample_categories, sample_quizzes, sample_questions)
+    return build_bulk_import_workbook(sample_subjects, sample_quizzes, sample_questions)
 
 
 def build_bulk_import_workbook(
-    categories: Sequence[ExportCategory],
+    subjects: Sequence[ExportSubject],
     quizzes: Sequence[ExportQuiz],
     questions: Sequence[ExportQuestion],
 ) -> bytes:
-    categories_rows: List[List[Any]] = [["Name", "Description", "Icon"]]
-    for category in categories:
-        categories_rows.append([
-            category.name,
-            category.description or "",
-            category.icon or "",
+    subjects_rows: List[List[Any]] = [["Name", "Description", "Icon"]]
+    for subject in subjects:
+        subjects_rows.append([
+            subject.name,
+            subject.description or "",
+            subject.icon or "",
         ])
 
     quizzes_rows: List[List[Any]] = [["Title", "Description", "Is Active", "Questions"]]
@@ -576,10 +576,10 @@ def build_bulk_import_workbook(
     questions_header = [
         "Prompt",
         "Explanation",
-        "Subject",
+        "Subject Label",
         "Difficulty",
         "Is Active",
-        "Category",
+        "Subject",
         *option_headers,
         "Correct Option",
         "Quizzes",
@@ -590,10 +590,10 @@ def build_bulk_import_workbook(
         row: List[Any] = [
             question.prompt,
             question.explanation or "",
-            question.subject or "",
+            question.subject_label or "",
             question.difficulty or "",
             question.is_active,
-            question.category_name,
+            question.subject_name,
         ]
         for index in range(option_width):
             option = question.options[index] if index < len(question.options) else None
@@ -604,7 +604,7 @@ def build_bulk_import_workbook(
         questions_rows.append(row)
 
     sheets = {
-        "Categories": categories_rows,
+        "Subjects": subjects_rows,
         "Quizzes": quizzes_rows,
         "Questions": questions_rows,
     }

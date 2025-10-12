@@ -14,12 +14,12 @@ from app.api.deps import (
     resolve_content_organization,
 )
 from app.core.security import get_password_hash
-from app.models.category import Category
+from app.models.subject import Subject
 from app.models.organization import OrgMembership, Organization
 from app.models.question import Option, Question, QuizQuestion
 from app.models.quiz import Quiz
 from app.models.user import LearnerUser, OrganizationUser, PlatformUser, User
-from app.schemas.admin import AdminCategorySnapshot, AdminOverview, AdminRecentQuiz, AdminTotals
+from app.schemas.admin import AdminSubjectSnapshot, AdminOverview, AdminRecentQuiz, AdminTotals
 from app.schemas.management import (
     AdminNotificationCreate,
     AdminNotificationResult,
@@ -32,8 +32,8 @@ from app.schemas.management import (
     MailConfigOut,
 )
 from app.schemas.bulk_import import (
-    BulkCategoryPayload,
-    BulkCategoryPreview,
+    BulkSubjectPayload,
+    BulkSubjectPreview,
     BulkImportCommit,
     BulkImportPreview,
     BulkImportResult,
@@ -48,7 +48,7 @@ from app.services.email_service import EmailService
 from app.services.notification_service import NotificationService
 from app.services.bulk_import_service import (
     BulkImportFormatError,
-    ExportCategory,
+    ExportSubject,
     ExportQuestion,
     ExportQuestionOption,
     ExportQuiz,
@@ -93,7 +93,7 @@ def get_admin_overview(
         inactive_questions=int(
             db.scalar(select(func.count()).select_from(Question).where(Question.is_active.is_(False))) or 0
         ),
-        total_categories=int(db.scalar(select(func.count()).select_from(Category)) or 0),
+        total_subjects=int(db.scalar(select(func.count()).select_from(Subject)) or 0),
         total_users=int(db.scalar(select(func.count()).select_from(User)) or 0),
     )
 
@@ -124,31 +124,31 @@ def get_admin_overview(
         for row in recent_rows
     ]
 
-    top_category_rows = db.execute(
+    top_subject_rows = db.execute(
         select(
-            Category.id,
-            Category.name,
+            Subject.id,
+            Subject.name,
             func.count(Question.id).label("question_count"),
         )
-        .join(Question, Question.category_id == Category.id, isouter=True)
-        .group_by(Category.id)
-        .order_by(func.count(Question.id).desc(), Category.name.asc())
+        .join(Question, Question.subject_id == Subject.id, isouter=True)
+        .group_by(Subject.id)
+        .order_by(func.count(Question.id).desc(), Subject.name.asc())
         .limit(6)
     ).all()
 
-    top_categories = [
-        AdminCategorySnapshot(
+    top_subjects = [
+        AdminSubjectSnapshot(
             id=row.id,
             name=row.name,
             question_count=int(row.question_count or 0),
         )
-        for row in top_category_rows
+        for row in top_subject_rows
     ]
 
     return AdminOverview(
         totals=totals,
         recent_quizzes=recent_quizzes,
-        top_categories=top_categories,
+        top_subjects=top_subjects,
     )
 
 
@@ -431,11 +431,11 @@ def download_bulk_import_export(
         allow_global_for_admin=True,
     )
 
-    categories = _load_export_categories(db, target_org_id)
+    subjects = _load_export_subjects(db, target_org_id)
     quizzes, quiz_title_map = _load_export_quizzes(db, target_org_id)
     questions = _load_export_questions(db, target_org_id, quiz_title_map)
 
-    workbook = build_bulk_import_workbook(categories, quizzes, questions)
+    workbook = build_bulk_import_workbook(subjects, quizzes, questions)
     headers = {"Content-Disposition": 'attachment; filename="bulk-import-export.xlsx"'}
     return Response(content=workbook, media_type=EXCEL_MEDIA_TYPE, headers=headers)
 
@@ -469,41 +469,41 @@ async def preview_bulk_import(
         allow_global_for_admin=True,
     )
 
-    existing_categories = _fetch_category_map(db, target_org_id)
+    existing_subjects = _fetch_subject_map(db, target_org_id)
     existing_quizzes = _fetch_quiz_map(db, target_org_id)
     existing_questions = _fetch_question_map(db, target_org_id)
 
-    category_slug_counts: dict[str, int] = {}
-    categories_preview: list[BulkCategoryPreview] = []
+    subject_slug_counts: dict[str, int] = {}
+    subjects_preview: list[BulkSubjectPreview] = []
 
-    for category in parsed.categories:
-        slug = slugify(category.name) if category.name else ""
-        errors = list(category.errors)
+    for subject in parsed.subjects:
+        slug = slugify(subject.name) if subject.name else ""
+        errors = list(subject.errors)
         if slug:
-            category_slug_counts[slug] = category_slug_counts.get(slug, 0) + 1
-            if category_slug_counts[slug] > 1:
-                errors.append("Duplicate category name in the workbook.")
+            subject_slug_counts[slug] = subject_slug_counts.get(slug, 0) + 1
+            if subject_slug_counts[slug] > 1:
+                errors.append("Duplicate subject name in the workbook.")
         elif not errors:
-            errors.append("Category name is required.")
+            errors.append("Subject name is required.")
 
-        existing = existing_categories.get(slug) if slug else None
-        categories_preview.append(
-            BulkCategoryPreview(
-                source_row=category.source_row,
-                name=category.name,
-                description=category.description,
-                icon=category.icon,
+        existing = existing_subjects.get(slug) if slug else None
+        subjects_preview.append(
+            BulkSubjectPreview(
+                source_row=subject.source_row,
+                name=subject.name,
+                description=subject.description,
+                icon=subject.icon,
                 slug=slug,
                 action="update" if existing else "create",
                 errors=errors,
             )
         )
 
-    valid_category_slugs = {
+    valid_subject_slugs = {
         item.slug
-        for item in categories_preview
+        for item in subjects_preview
         if item.slug and not item.errors
-    } | set(existing_categories.keys())
+    } | set(existing_subjects.keys())
 
     quiz_title_counts: dict[str, int] = {}
     quizzes_preview: list[BulkQuizPreview] = []
@@ -565,10 +565,10 @@ async def preview_bulk_import(
         else:
             errors.append("Question prompt is required.")
 
-        category_slug = slugify(question.category_name) if question.category_name else ""
-        if category_slug not in valid_category_slugs:
+        subject_slug = slugify(question.subject_name) if question.subject_name else ""
+        if subject_slug not in valid_subject_slugs:
             errors.append(
-                f"Category '{question.category_name or 'Unknown'}' is not defined in the Categories sheet or existing library."
+                f"Subject '{question.subject_name or 'Unknown'}' is not defined in the Subjects sheet or existing library."
             )
 
         for title in question.quiz_titles:
@@ -585,10 +585,10 @@ async def preview_bulk_import(
                 source_row=question.source_row,
                 prompt=question.prompt,
                 explanation=question.explanation,
-                subject=question.subject,
+                subject=question.subject_label,
                 difficulty=question.difficulty,
                 is_active=question.is_active,
-                category_name=question.category_name,
+                subject_name=question.subject_name,
                 quiz_titles=question.quiz_titles,
                 options=[
                     BulkQuestionOption(text=option.text, is_correct=option.is_correct)
@@ -600,7 +600,7 @@ async def preview_bulk_import(
         )
 
     return BulkImportPreview(
-        categories=categories_preview,
+        subjects=subjects_preview,
         quizzes=quizzes_preview,
         questions=questions_preview,
         warnings=parsed.warnings,
@@ -620,14 +620,14 @@ def commit_bulk_import(
         allow_global_for_admin=True,
     )
 
-    if not payload.categories and not payload.questions and not payload.quizzes:
+    if not payload.subjects and not payload.questions and not payload.quizzes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No records to import.")
 
-    _ensure_unique_categories(payload.categories)
+    _ensure_unique_subjects(payload.subjects)
     _ensure_valid_questions(payload.questions)
     _ensure_unique_quizzes(payload.quizzes)
 
-    existing_categories = _fetch_category_map(db, target_org_id)
+    existing_subjects = _fetch_subject_map(db, target_org_id)
     existing_quizzes = _fetch_quiz_map(db, target_org_id)
 
     quiz_titles_defined = {quiz.title.strip().lower(): quiz for quiz in payload.quizzes if quiz.title.strip()}
@@ -648,11 +648,11 @@ def commit_bulk_import(
 
     existing_questions = _fetch_question_map(db, target_org_id, prompts=all_needed_prompts)
 
-    category_lookup = dict(existing_categories)
+    subject_lookup = dict(existing_subjects)
 
     result = BulkImportResult(
-        categories_created=0,
-        categories_updated=0,
+        subjects_created=0,
+        subjects_updated=0,
         quizzes_created=0,
         quizzes_updated=0,
         questions_created=0,
@@ -660,57 +660,57 @@ def commit_bulk_import(
     )
 
     try:
-        # Categories
-        for category in payload.categories:
-            slug = slugify(category.name)
-            existing = category_lookup.get(slug)
-            description = _normalize_optional(category.description)
-            icon = _normalize_optional(category.icon)
+        # Subjects
+        for subject in payload.subjects:
+            slug = slugify(subject.name)
+            existing = subject_lookup.get(slug)
+            description = _normalize_optional(subject.description)
+            icon = _normalize_optional(subject.icon)
             if existing is not None:
-                existing.name = category.name.strip()
+                existing.name = subject.name.strip()
                 existing.description = description
                 existing.icon = icon
                 existing.organization_id = target_org_id
-                result.categories_updated += 1
+                result.subjects_updated += 1
             else:
-                new_category = Category(
-                    name=category.name.strip(),
+                new_subject = Subject(
+                    name=subject.name.strip(),
                     slug=slug,
                     description=description,
                     icon=icon,
                     organization_id=target_org_id,
                 )
-                db.add(new_category)
+                db.add(new_subject)
                 db.flush()
-                category_lookup[slug] = new_category
-                result.categories_created += 1
+                subject_lookup[slug] = new_subject
+                result.subjects_created += 1
 
         # Questions
         question_lookup = dict(existing_questions)
         for question in payload.questions:
             prompt = question.prompt.strip()
             prompt_key = prompt.lower()
-            category_slug = slugify(question.category_name)
-            category = category_lookup.get(category_slug)
-            if category is None:
+            subject_slug = slugify(question.subject_name)
+            subject_model = subject_lookup.get(subject_slug)
+            if subject_model is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Category '{question.category_name}' is not available.",
+                    detail=f"Subject '{question.subject_name}' is not available.",
                 )
 
             existing_question = question_lookup.get(prompt_key)
             explanation = _normalize_optional(question.explanation)
-            subject = _normalize_optional(question.subject)
+            subject_label = _normalize_optional(question.subject_label)
             difficulty = _normalize_optional(question.difficulty)
 
             if existing_question is None:
                 new_question = Question(
                     prompt=prompt,
                     explanation=explanation,
-                    subject=subject,
+                    subject_label=subject_label,
                     difficulty=difficulty,
                     is_active=question.is_active,
-                    category_id=category.id,
+                    subject_id=subject_model.id,
                     organization_id=target_org_id,
                 )
                 db.add(new_question)
@@ -728,10 +728,10 @@ def commit_bulk_import(
             else:
                 existing_question.prompt = prompt
                 existing_question.explanation = explanation
-                existing_question.subject = subject
+                existing_question.subject_label = subject_label
                 existing_question.difficulty = difficulty
                 existing_question.is_active = question.is_active
-                existing_question.category_id = category.id
+                existing_question.subject_id = subject_model.id
                 existing_question.organization_id = target_org_id
                 db.query(Option).filter(Option.question_id == existing_question.id).delete(synchronize_session=False)
                 for option in question.options:
@@ -799,13 +799,13 @@ def commit_bulk_import(
     return result
 
 
-def _fetch_category_map(db: Session, organization_id: int | None) -> dict[str, Category]:
-    stmt = select(Category)
+def _fetch_subject_map(db: Session, organization_id: int | None) -> dict[str, Subject]:
+    stmt = select(Subject)
     if organization_id is None:
-        stmt = stmt.where(Category.organization_id.is_(None))
+        stmt = stmt.where(Subject.organization_id.is_(None))
     else:
-        stmt = stmt.where(Category.organization_id == organization_id)
-    return {category.slug: category for category in db.scalars(stmt).all()}
+        stmt = stmt.where(Subject.organization_id == organization_id)
+    return {subject.slug: subject for subject in db.scalars(stmt).all()}
 
 
 def _fetch_quiz_map(db: Session, organization_id: int | None) -> dict[str, Quiz]:
@@ -835,20 +835,20 @@ def _fetch_question_map(
     return {question.prompt.strip().lower(): question for question in db.scalars(stmt).all()}
 
 
-def _load_export_categories(db: Session, organization_id: int | None) -> list[ExportCategory]:
-    stmt = select(Category).order_by(Category.name.asc())
+def _load_export_subjects(db: Session, organization_id: int | None) -> list[ExportSubject]:
+    stmt = select(Subject).order_by(Subject.name.asc())
     if organization_id is None:
-        stmt = stmt.where(Category.organization_id.is_(None))
+        stmt = stmt.where(Subject.organization_id.is_(None))
     else:
-        stmt = stmt.where(Category.organization_id == organization_id)
-    categories = db.scalars(stmt).all()
+        stmt = stmt.where(Subject.organization_id == organization_id)
+    subjects = db.scalars(stmt).all()
     return [
-        ExportCategory(
-            name=category.name.strip(),
-            description=category.description,
-            icon=category.icon,
+        ExportSubject(
+            name=subject.name.strip(),
+            description=subject.description,
+            icon=subject.icon,
         )
-        for category in categories
+        for subject in subjects
     ]
 
 
@@ -893,7 +893,7 @@ def _load_export_questions(
 ) -> list[ExportQuestion]:
     stmt = (
         select(Question)
-        .options(selectinload(Question.options), selectinload(Question.category))
+        .options(selectinload(Question.options), selectinload(Question.subject))
         .order_by(Question.prompt.asc())
     )
     if organization_id is None:
@@ -918,7 +918,7 @@ def _load_export_questions(
 
     export_questions: list[ExportQuestion] = []
     for question in questions:
-        category_name = question.category.name if question.category else ""
+        subject_name = question.subject.name if question.subject else ""
         export_questions.append(
             ExportQuestion(
                 prompt=question.prompt,
@@ -926,7 +926,7 @@ def _load_export_questions(
                 subject=question.subject,
                 difficulty=question.difficulty,
                 is_active=question.is_active,
-                category_name=category_name,
+                subject_name=subject_name,
                 quiz_titles=quiz_assignments.get(question.id, []),
                 options=[
                     ExportQuestionOption(text=option.text, is_correct=option.is_correct)
@@ -944,17 +944,17 @@ def _normalize_optional(value: str | None) -> str | None:
     return trimmed or None
 
 
-def _ensure_unique_categories(categories: list[BulkCategoryPayload]) -> None:
+def _ensure_unique_subjects(subjects: list[BulkSubjectPayload]) -> None:
     seen: set[str] = set()
-    for category in categories:
-        name = category.name.strip()
+    for subject in subjects:
+        name = subject.name.strip()
         if not name:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name cannot be empty.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subject name cannot be empty.")
         slug = slugify(name)
         if slug in seen:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Duplicate category name '{category.name}' in payload.",
+                detail=f"Duplicate subject name '{subject.name}' in payload.",
             )
         seen.add(slug)
 

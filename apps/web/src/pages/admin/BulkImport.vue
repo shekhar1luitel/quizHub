@@ -2,7 +2,7 @@
 import { computed, reactive, ref, type Ref } from 'vue'
 import { http } from '../../api/http'
 
-interface PreviewCategory {
+interface PreviewSubject {
   source_row: number | null
   name: string
   description: string | null
@@ -31,10 +31,10 @@ interface PreviewQuestion {
   source_row: number | null
   prompt: string
   explanation: string | null
-  subject: string | null
+  subject_label: string | null
   difficulty: string | null
   is_active: boolean
-  category_name: string
+  subject_name: string
   quiz_titles: string[]
   options: PreviewQuestionOption[]
   action: 'create' | 'update'
@@ -42,22 +42,22 @@ interface PreviewQuestion {
 }
 
 interface PreviewResponse {
-  categories: PreviewCategory[]
+  subjects: PreviewSubject[]
   quizzes: PreviewQuiz[]
   questions: PreviewQuestion[]
   warnings: string[]
 }
 
 interface BulkImportResult {
-  categories_created: number
-  categories_updated: number
+  subjects_created: number
+  subjects_updated: number
   quizzes_created: number
   quizzes_updated: number
   questions_created: number
   questions_updated: number
 }
 
-interface CategoryForm {
+interface SubjectForm {
   name: string
   description: string
   icon: string
@@ -78,10 +78,10 @@ interface QuestionOptionForm {
 interface QuestionForm {
   prompt: string
   explanation: string
-  subject: string
+  subject_label: string
   difficulty: string
   is_active: boolean
-  category_name: string
+  subject_name: string
   quizTitlesText: string
   options: QuestionOptionForm[]
 }
@@ -90,7 +90,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const loading = ref(false)
 const preview = ref<PreviewResponse | null>(null)
 const form = reactive({
-  categories: [] as CategoryForm[],
+  subjects: [] as SubjectForm[],
   quizzes: [] as QuizForm[],
   questions: [] as QuestionForm[],
 })
@@ -108,20 +108,20 @@ const hasPreview = computed(() => preview.value !== null)
 const totalPendingCreates = computed(() => {
   if (!preview.value) return 0
   return [
-    preview.value.categories.filter((category) => category.action === 'create').length,
+    preview.value.subjects.filter((subject) => subject.action === 'create').length,
     preview.value.quizzes.filter((quiz) => quiz.action === 'create').length,
     preview.value.questions.filter((question) => question.action === 'create').length,
   ].reduce((acc, count) => acc + count, 0)
 })
 
-const uploadHint = `Prepare a single Excel workbook (.xlsx) with sheets named “Categories”, “Quizzes”, and “Questions”.
-Use headers “Name/Description/Icon” for categories, “Title/Description/Is Active/Questions” for quizzes, and include
-columns for “Prompt, Explanation, Subject, Difficulty, Category, Option 1..n, Correct Option, Quizzes” for questions.`
+const uploadHint = `Prepare a single Excel workbook (.xlsx) with sheets named “Subjects”, “Quizzes”, and “Questions”.
+Use headers “Name/Description/Icon” for subjects, “Title/Description/Is Active/Questions” for quizzes, and include
+columns for “Prompt, Explanation, Subject, Difficulty, Subject, Option 1..n, Correct Option, Quizzes” for questions.`
 
 const hasRowErrors = computed(() => {
   if (!preview.value) return false
   return (
-    preview.value.categories.some((category) => category.errors.length > 0) ||
+    preview.value.subjects.some((subject) => subject.errors.length > 0) ||
     preview.value.quizzes.some((quiz) => quiz.errors.length > 0) ||
     preview.value.questions.some((question) => question.errors.length > 0)
   )
@@ -138,17 +138,17 @@ const pickFile = () => {
 const formatWarnings = computed(() => preview.value?.warnings ?? [])
 
 const resetForm = () => {
-  form.categories = []
+  form.subjects = []
   form.quizzes = []
   form.questions = []
 }
 
 const prepareForm = (data: PreviewResponse) => {
   resetForm()
-  form.categories = data.categories.map((category) => ({
-    name: category.name,
-    description: category.description ?? '',
-    icon: category.icon ?? '',
+  form.subjects = data.subjects.map((subject) => ({
+    name: subject.name,
+    description: subject.description ?? '',
+    icon: subject.icon ?? '',
   }))
   form.quizzes = data.quizzes.map((quiz) => ({
     title: quiz.title,
@@ -159,10 +159,10 @@ const prepareForm = (data: PreviewResponse) => {
   form.questions = data.questions.map((question) => ({
     prompt: question.prompt,
     explanation: question.explanation ?? '',
-    subject: question.subject ?? '',
+    subject_label: question.subject_label ?? '',
     difficulty: question.difficulty ?? '',
     is_active: question.is_active,
-    category_name: question.category_name,
+    subject_name: question.subject_name,
     quizTitlesText: question.quiz_titles.join(', '),
     options: question.options.map((option) => ({ ...option })),
   }))
@@ -231,10 +231,10 @@ const commitImport = async () => {
   result.value = null
 
   const payload = {
-    categories: form.categories.map((category) => ({
-      name: category.name,
-      description: category.description || null,
-      icon: category.icon || null,
+    subjects: form.subjects.map((subject) => ({
+      name: subject.name,
+      description: subject.description || null,
+      icon: subject.icon || null,
     })),
     quizzes: form.quizzes.map((quiz) => ({
       title: quiz.title,
@@ -245,10 +245,10 @@ const commitImport = async () => {
     questions: form.questions.map((question) => ({
       prompt: question.prompt,
       explanation: question.explanation || null,
-      subject: question.subject || null,
+      subject_label: question.subject_label || null,
       difficulty: question.difficulty || null,
       is_active: question.is_active,
-      category_name: question.category_name,
+      subject_name: question.subject_name,
       quiz_titles: splitList(question.quizTitlesText),
       options: question.options.map((option) => ({
         text: option.text,
@@ -272,9 +272,9 @@ const pendingSummary = computed(() => {
   if (!preview.value) return []
   return [
     {
-      label: 'Categories',
-      create: preview.value.categories.filter((item) => item.action === 'create').length,
-      update: preview.value.categories.filter((item) => item.action === 'update').length,
+      label: 'Subjects',
+      create: preview.value.subjects.filter((item) => item.action === 'create').length,
+      update: preview.value.subjects.filter((item) => item.action === 'update').length,
     },
     {
       label: 'Quizzes',
@@ -290,13 +290,13 @@ const pendingSummary = computed(() => {
 })
 
 const hasData = computed(() =>
-  form.categories.length + form.quizzes.length + form.questions.length > 0
+  form.subjects.length + form.quizzes.length + form.questions.length > 0
 )
 
-const categoryEntries = computed(() =>
-  form.categories.map((category, index) => ({
-    form: category,
-    meta: preview.value?.categories[index] ?? null,
+const subjectEntries = computed(() =>
+  form.subjects.map((subject, index) => ({
+    form: subject,
+    meta: preview.value?.subjects[index] ?? null,
     index,
   }))
 )
@@ -317,10 +317,10 @@ const questionEntries = computed(() =>
   }))
 )
 
-const discardCategory = (index: number) => {
-  form.categories.splice(index, 1)
+const discardSubject = (index: number) => {
+  form.subjects.splice(index, 1)
   if (preview.value) {
-    preview.value.categories.splice(index, 1)
+    preview.value.subjects.splice(index, 1)
   }
 }
 
@@ -370,7 +370,7 @@ const downloadExport = () =>
     <header class="space-y-2">
       <h1 class="text-3xl font-semibold text-slate-900">Bulk content importer</h1>
       <p class="max-w-3xl text-sm text-slate-500">
-        Upload a structured Excel workbook to create or update categories, questions, and quizzes in one
+        Upload a structured Excel workbook to create or update subjects, questions, and quizzes in one
         step. Preview the detected changes, adjust the values inline, then publish everything together.
       </p>
     </header>
@@ -409,7 +409,7 @@ const downloadExport = () =>
           <p class="mt-2 text-sm text-slate-500">Each sheet follows a simple column layout:</p>
           <ul class="mt-4 space-y-3 text-xs text-slate-600">
             <li class="rounded-2xl bg-slate-50 px-4 py-3">
-              <p class="font-semibold text-slate-800">Categories</p>
+              <p class="font-semibold text-slate-800">Subjects</p>
               <p>Name · Description · Icon</p>
             </li>
             <li class="rounded-2xl bg-slate-50 px-4 py-3">
@@ -419,7 +419,7 @@ const downloadExport = () =>
             <li class="rounded-2xl bg-slate-50 px-4 py-3">
               <p class="font-semibold text-slate-800">Questions</p>
               <p>
-                Prompt · Explanation · Subject · Difficulty · Is Active · Category · Option 1..n · Correct Option · Quizzes
+                Prompt · Explanation · Subject · Difficulty · Is Active · Subject · Option 1..n · Correct Option · Quizzes
               </p>
             </li>
           </ul>
@@ -481,27 +481,27 @@ const downloadExport = () =>
           <div class="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
             <section class="flex min-w-0 flex-col gap-4">
               <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
-                <p class="text-xs text-slate-500">{{ form.categories.length }} entries detected</p>
+                <h2 class="text-lg font-semibold text-slate-900">Subjects</h2>
+                <p class="text-xs text-slate-500">{{ form.subjects.length }} entries detected</p>
               </div>
               <div
-                v-if="form.categories.length === 0"
+                v-if="form.subjects.length === 0"
                 class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
               >
-                No categories were detected in this workbook.
+                No subjects were detected in this workbook.
               </div>
               <div v-else class="space-y-4">
                 <article
-                  v-for="entry in categoryEntries"
-                  :key="entry.meta?.source_row ?? `category-${entry.index}`"
+                  v-for="entry in subjectEntries"
+                  :key="entry.meta?.source_row ?? `subject-${entry.index}`"
                   class="relative min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <button
                     type="button"
                     class="absolute -right-3 -top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-400 shadow-sm transition hover:border-rose-200 hover:text-rose-500"
-                    @click="discardCategory(entry.index)"
-                    aria-label="Discard category"
-                    title="Discard category"
+                    @click="discardSubject(entry.index)"
+                    aria-label="Discard subject"
+                    title="Discard subject"
                   >
                     <span aria-hidden="true">×</span>
                   </button>
@@ -639,15 +639,15 @@ const downloadExport = () =>
                     </label>
                     <label class="flex flex-col gap-1 text-sm">
                       <span class="font-medium text-slate-600">Subject</span>
-                      <input v-model="entry.form.subject" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                      <input v-model="entry.form.subject_label" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
                     <label class="flex flex-col gap-1 text-sm">
                       <span class="font-medium text-slate-600">Difficulty</span>
                       <input v-model="entry.form.difficulty" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
                     <label class="flex flex-col gap-1 text-sm">
-                      <span class="font-medium text-slate-600">Category</span>
-                      <input v-model="entry.form.category_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
+                      <span class="font-medium text-slate-600">Subject</span>
+                      <input v-model="entry.form.subject_name" type="text" class="rounded-2xl border border-slate-200 px-4 py-2 focus:border-slate-400 focus:outline-none" />
                     </label>
                     <label class="flex flex-col gap-1 text-sm sm:col-span-2 xl:col-span-2">
                       <span class="font-medium text-slate-600">Assign to quizzes (comma separated titles)</span>
@@ -725,8 +725,8 @@ const downloadExport = () =>
           </p>
           <div v-if="result" class="mt-4 grid gap-3 md:grid-cols-3">
             <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
-              <p class="font-semibold text-slate-900">Categories</p>
-              <p>{{ result.categories_created }} created · {{ result.categories_updated }} updated</p>
+              <p class="font-semibold text-slate-900">Subjects</p>
+              <p>{{ result.subjects_created }} created · {{ result.subjects_updated }} updated</p>
             </div>
             <div class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">
               <p class="font-semibold text-slate-900">Quizzes</p>

@@ -18,14 +18,14 @@ class Question(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     prompt: Mapped[str] = mapped_column(Text(), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text())
-    subject: Mapped[str | None] = mapped_column(String(100))
+    subject_label: Mapped[str | None] = mapped_column("subject", String(100))
     topic: Mapped[str | None] = mapped_column(String(100))
     difficulty: Mapped[str | None] = mapped_column(String(50))
     text_en: Mapped[str | None] = mapped_column(Text())
     text_ne: Mapped[str | None] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("subjects.id", ondelete="RESTRICT"), nullable=False
     )
     organization_id: Mapped[int | None] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
@@ -37,7 +37,7 @@ class Question(Base):
     quizzes: Mapped[List["QuizQuestion"]] = relationship(
         "QuizQuestion", back_populates="question", cascade="all, delete-orphan"
     )
-    category: Mapped["Category"] = relationship("Category", back_populates="questions")
+    subject: Mapped["Subject"] = relationship("Subject", back_populates="questions")
     organization: Mapped["Organization | None"] = relationship(
         "Organization", back_populates="questions"
     )

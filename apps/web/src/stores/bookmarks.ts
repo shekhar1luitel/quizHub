@@ -8,10 +8,10 @@ export interface BookmarkEntry {
   question_id: number
   created_at: string
   prompt: string
-  subject: string | null
+  subject_label: string | null
   difficulty: string | null
-  category_id: number
-  category_name: string
+  subject_id: number
+  subject_name: string
 }
 
 interface BookmarkState {

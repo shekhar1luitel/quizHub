@@ -13,7 +13,7 @@ interface QuizSummary {
   organization_id?: number | null
 }
 
-interface PracticeCategorySummary {
+interface PracticeSubjectSummary {
   id?: number
   slug: string
   name: string
@@ -30,17 +30,17 @@ type TimeLimitOption = 10 | 15 | 20
 const router = useRouter()
 
 const quizzes = ref<QuizSummary[]>([])
-const categories = ref<PracticeCategorySummary[]>([])
+const subjects = ref<PracticeSubjectSummary[]>([])
 const loading = reactive({
   quizzes: false,
-  categories: false,
+  subjects: false,
   submitting: false,
 })
 const error = ref<string | null>(null)
 const STORAGE_KEY = 'quizHub::quiz-setup-preferences'
 
 const filters = reactive({
-  categorySlug: '' as string,
+  subjectSlug: '' as string,
   difficulty: '' as string,
   quizId: null as number | null,
   timeLimit: 15 as TimeLimitOption,
@@ -51,7 +51,7 @@ const difficultyOptions = ['Easy', 'Medium', 'Hard', 'Mixed']
 const hasSavedSetup = ref(false)
 
 const selectedQuiz = computed(() => quizzes.value.find((quiz) => quiz.id === filters.quizId) ?? null)
-const selectedCategory = computed(() => categories.value.find((cat) => cat.slug === filters.categorySlug) ?? null)
+const selectedSubject = computed(() => subjects.value.find((cat) => cat.slug === filters.subjectSlug) ?? null)
 const recommendedQuiz = computed(() => {
   if (!quizzes.value.length) return null
   return quizzes.value.find((quiz) => quiz.is_active) ?? quizzes.value[0]
@@ -59,7 +59,7 @@ const recommendedQuiz = computed(() => {
 const quickStartBusy = computed(() => loading.quizzes || loading.submitting)
 const savedSetupMeta = computed(() => {
   const parts: string[] = []
-  if (selectedCategory.value) parts.push(selectedCategory.value.name)
+  if (selectedSubject.value) parts.push(selectedSubject.value.name)
   if (filters.difficulty) parts.push(filters.difficulty)
   parts.push(`${filters.timeLimit} min`)
   return parts.join(' · ')
@@ -77,16 +77,16 @@ const recommendedMeta = computed(() => {
 })
 
 const filteredQuizzes = computed(() => {
-  const selectedSlug = filters.categorySlug
+  const selectedSlug = filters.subjectSlug
   return quizzes.value.filter((quiz) => {
     if (!quiz.is_active) return false
     if (!selectedSlug) return true
-    const category = categories.value.find((cat) => cat.slug === selectedSlug)
-    if (!category) return true
+    const subject = subjects.value.find((cat) => cat.slug === selectedSlug)
+    if (!subject) return true
     const normalizedTitle = quiz.title.toLowerCase()
     return (
-      normalizedTitle.includes(category.name.toLowerCase()) ||
-      (category.description ? normalizedTitle.includes(category.description.toLowerCase()) : false)
+      normalizedTitle.includes(subject.name.toLowerCase()) ||
+      (subject.description ? normalizedTitle.includes(subject.description.toLowerCase()) : false)
     )
   })
 })
@@ -99,8 +99,8 @@ const restoreFilters = () => {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return
     const saved = JSON.parse(raw) as Partial<typeof filters>
-    if (typeof saved.categorySlug === 'string') {
-      filters.categorySlug = saved.categorySlug
+    if (typeof saved.subjectSlug === 'string') {
+      filters.subjectSlug = saved.subjectSlug
     }
     if (typeof saved.difficulty === 'string') {
       filters.difficulty = saved.difficulty
@@ -113,7 +113,7 @@ const restoreFilters = () => {
     }
     hasSavedSetup.value = Boolean(
       saved.quizId ||
-        saved.categorySlug ||
+        saved.subjectSlug ||
         saved.difficulty ||
         (typeof saved.timeLimit === 'number' && (timeOptions as number[]).includes(saved.timeLimit))
     )
@@ -126,13 +126,13 @@ const persistFilters = () => {
   if (typeof window === 'undefined') return
   try {
     const payload = {
-      categorySlug: filters.categorySlug,
+      subjectSlug: filters.subjectSlug,
       difficulty: filters.difficulty,
       quizId: filters.quizId,
       timeLimit: filters.timeLimit,
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-    hasSavedSetup.value = Boolean(payload.quizId || payload.categorySlug || payload.difficulty || payload.timeLimit)
+    hasSavedSetup.value = Boolean(payload.quizId || payload.subjectSlug || payload.difficulty || payload.timeLimit)
   } catch (persistError) {
     console.warn('Unable to persist quiz setup preferences', persistError)
   }
@@ -156,15 +156,15 @@ const loadQuizzes = async () => {
   }
 }
 
-const loadCategories = async () => {
-  loading.categories = true
+const loadSubjects = async () => {
+  loading.subjects = true
   try {
-    const { data } = await http.get<PracticeCategorySummary[]>('/practice/categories')
-    categories.value = data
+    const { data } = await http.get<PracticeSubjectSummary[]>('/practice/subjects')
+    subjects.value = data
   } catch (err) {
     console.error(err)
   } finally {
-    loading.categories = false
+    loading.subjects = false
   }
 }
 
@@ -178,7 +178,7 @@ const startQuiz = () => {
     })
 }
 
-const goToCategories = (slug: string) => {
+const goToSubjects = (slug: string) => {
   router.push({ name: 'practice', params: { slug } })
 }
 
@@ -201,11 +201,11 @@ const startRecommendedQuiz = () => {
 onMounted(() => {
   restoreFilters()
   loadQuizzes()
-  loadCategories()
+  loadSubjects()
 })
 
 watch(
-  () => [filters.categorySlug, filters.difficulty, filters.quizId, filters.timeLimit],
+  () => [filters.subjectSlug, filters.difficulty, filters.quizId, filters.timeLimit],
   () => {
     persistFilters()
   }
@@ -225,7 +225,7 @@ watch(
         </div>
         <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
           <p class="font-semibold uppercase tracking-[0.3em] text-slate-400">Quick tip</p>
-          <p>Not sure where to begin? Select a category below and start with the recommended mock test.</p>
+          <p>Not sure where to begin? Select a subject below and start with the recommended mock test.</p>
         </div>
       </div>
     </header>
@@ -287,21 +287,21 @@ watch(
             <div class="flex flex-wrap gap-2">
               <button
                 class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition"
-                :class="filters.categorySlug === '' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'"
+                :class="filters.subjectSlug === '' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'"
                 type="button"
-                @click="filters.categorySlug = ''"
+                @click="filters.subjectSlug = ''"
               >
                 All subjects
               </button>
               <button
-                v-for="category in categories"
-                :key="category.slug"
+                v-for="subject in subjects"
+                :key="subject.slug"
                 class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition"
-                :class="filters.categorySlug === category.slug ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'"
+                :class="filters.subjectSlug === subject.slug ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'"
                 type="button"
-                @click="filters.categorySlug = category.slug"
+                @click="filters.subjectSlug = subject.slug"
               >
-                {{ category.name }}
+                {{ subject.name }}
               </button>
             </div>
           </div>
@@ -413,32 +413,32 @@ watch(
       <aside class="space-y-5 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl shadow-brand-900/10">
         <header class="space-y-2">
           <p class="text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-400">Recommended focus</p>
-          <h2 class="text-lg font-semibold text-slate-900">Popular categories</h2>
+          <h2 class="text-lg font-semibold text-slate-900">Popular subjects</h2>
           <p class="text-xs text-slate-500">Jump into areas learners practice most often.</p>
         </header>
         <div class="space-y-3">
           <article
-            v-for="category in categories.slice(0, 4)"
-            :key="category.slug"
+            v-for="subject in subjects.slice(0, 4)"
+            :key="subject.slug"
             class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="space-y-1">
-                <p class="text-sm font-semibold text-slate-900">{{ category.name }}</p>
-                <p class="text-xs text-slate-500">{{ category.description || 'Sharpen your fundamentals with targeted questions.' }}</p>
+                <p class="text-sm font-semibold text-slate-900">{{ subject.name }}</p>
+                <p class="text-xs text-slate-500">{{ subject.description || 'Sharpen your fundamentals with targeted questions.' }}</p>
               </div>
               <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                {{ category.total_questions }} qns
+                {{ subject.total_questions }} qns
               </span>
             </div>
             <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
               <span>
-                {{ category.difficulty }}
+                {{ subject.difficulty }}
               </span>
               <button
                 class="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 transition hover:text-brand-500"
                 type="button"
-                @click="goToCategories(category.slug)"
+                @click="goToSubjects(subject.slug)"
               >
                 Practice
                 <span aria-hidden="true">→</span>

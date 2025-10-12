@@ -6,7 +6,7 @@ const routes = [
   { path: '/', name: 'home', component: () => import('../pages/Home.vue'), meta: { title: 'Home' } },
   { path: '/quiz/setup', name: 'quiz-setup', component: () => import('../pages/QuizSetup.vue'), meta: { requiresAuth: true, requiresLearner: true, title: 'Quiz Setup' } },
   { path: '/bookmarks', name: 'bookmarks', component: () => import('../pages/Bookmarks.vue'), meta: { requiresAuth: true, requiresLearner: true, title: 'Bookmarks' } },
-  { path: '/categories', name: 'categories', component: () => import('../pages/Categories.vue'), meta: { title: 'Categories' } },
+  { path: '/subjects', name: 'subjects', component: () => import('../pages/Subjects.vue'), meta: { title: 'Subjects' } },
   { path: '/practice/:slug', name: 'practice', component: () => import('../pages/Practice.vue'), props: true, meta: { requiresAuth: true, requiresLearner: true, title: 'Practice' } },
   { path: '/quiz/:id', name: 'quiz', component: () => import('../pages/Quiz.vue'), props: true, meta: { requiresAuth: true, requiresLearner: true, title: 'Quiz' } },
   {
@@ -102,16 +102,16 @@ const routes = [
     meta: { requiresAdmin: true, title: 'Bulk Import' },
   },
   {
-    path: '/admin/categories',
-    name: 'admin-categories',
-    component: () => import('../pages/admin/CategoriesCRUD.vue'),
-    meta: { requiresAdmin: true, title: 'Category Studio' },
+    path: '/admin/subjects',
+    name: 'admin-subjects',
+    component: () => import('../pages/admin/SubjectsCRUD.vue'),
+    meta: { requiresAdmin: true, title: 'Subject Studio' },
   },
   {
-    path: '/admin/categories/library',
-    name: 'admin-category-library',
-    component: () => import('../pages/admin/CategoriesLibrary.vue'),
-    meta: { requiresAdmin: true, title: 'Category Library' },
+    path: '/admin/subjects/library',
+    name: 'admin-subject-library',
+    component: () => import('../pages/admin/SubjectsLibrary.vue'),
+    meta: { requiresAdmin: true, title: 'Subject Library' },
   },
   {
     path: '/admin/users',

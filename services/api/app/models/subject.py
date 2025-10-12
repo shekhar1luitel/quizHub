@@ -6,12 +6,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
-class Category(Base):
-    __tablename__ = "categories"
+class Subject(Base):
+    __tablename__ = "subjects"
     __table_args__ = (
-        UniqueConstraint("organization_id", "slug", name="uq_categories_org_slug"),
-        UniqueConstraint("organization_id", "name", name="uq_categories_org_name"),
-        Index("ix_categories_name", "name"),
+        UniqueConstraint("organization_id", "slug", name="uq_subjects_org_slug"),
+        UniqueConstraint("organization_id", "name", name="uq_subjects_org_name"),
+        Index("ix_subjects_name", "name"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -24,11 +24,11 @@ class Category(Base):
     )
 
     questions: Mapped[list["Question"]] = relationship(
-        "Question", back_populates="category"
+        "Question", back_populates="subject"
     )
     organization: Mapped["Organization | None"] = relationship(
-        "Organization", back_populates="categories"
+        "Organization", back_populates="subjects"
     )
 
 
-__all__ = ["Category"]
+__all__ = ["Subject"]

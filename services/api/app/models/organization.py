@@ -46,8 +46,8 @@ class Organization(Base):
     learner_accounts: Mapped[List["LearnerUser"]] = relationship(
         "LearnerUser", back_populates="primary_organization", cascade="all, delete-orphan"
     )
-    categories: Mapped[List["Category"]] = relationship(
-        "Category", back_populates="organization", cascade="all, delete-orphan"
+    subjects: Mapped[List["Subject"]] = relationship(
+        "Subject", back_populates="organization", cascade="all, delete-orphan"
     )
     questions: Mapped[List["Question"]] = relationship(
         "Question", back_populates="organization", cascade="all, delete-orphan"

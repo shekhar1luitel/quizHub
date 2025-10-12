@@ -8,7 +8,7 @@ const router = useRouter()
 const bookmarkStore = useBookmarkStore()
 const authStore = useAuthStore()
 
-const selectedCategory = ref('all')
+const selectedSubject = ref('all')
 const selectedDifficulty = ref('all')
 const searchTerm = ref('')
 const bookmarkBusy = ref<Record<number, boolean>>({})
@@ -20,11 +20,11 @@ let toastTimeout: number | null = null
 const entries = computed<BookmarkEntry[]>(() => bookmarkStore.entries)
 const isLoading = computed(() => bookmarkStore.loadingEntries && entries.value.length === 0)
 
-const categories = computed(() => {
+const subjects = computed(() => {
   const names = new Set<string>()
   for (const entry of entries.value) {
-    if (entry.category_name) {
-      names.add(entry.category_name)
+    if (entry.subject_name) {
+      names.add(entry.subject_name)
     }
   }
   return Array.from(names).sort((a, b) => a.localeCompare(b))
@@ -42,14 +42,14 @@ const difficulties = computed(() => {
 
 const filteredEntries = computed(() => {
   return entries.value.filter((entry) => {
-    const matchesCategory =
-      selectedCategory.value === 'all' || entry.category_name === selectedCategory.value
+    const matchesSubject =
+      selectedSubject.value === 'all' || entry.subject_name === selectedSubject.value
     const matchesDifficulty =
       selectedDifficulty.value === 'all' || entry.difficulty === selectedDifficulty.value
     const matchesSearch =
       searchTerm.value.trim().length === 0 ||
       entry.prompt.toLowerCase().includes(searchTerm.value.trim().toLowerCase())
-    return matchesCategory && matchesDifficulty && matchesSearch
+    return matchesSubject && matchesDifficulty && matchesSearch
   })
 })
 
@@ -57,7 +57,7 @@ const hasEntries = computed(() => entries.value.length > 0)
 const hasFilteredResults = computed(() => filteredEntries.value.length > 0)
 const hasActiveFilters = computed(
   () =>
-    selectedCategory.value !== 'all' ||
+    selectedSubject.value !== 'all' ||
     selectedDifficulty.value !== 'all' ||
     searchTerm.value.trim().length > 0
 )
@@ -85,7 +85,7 @@ const hideToast = () => {
 }
 
 const clearFilters = () => {
-  selectedCategory.value = 'all'
+  selectedSubject.value = 'all'
   selectedDifficulty.value = 'all'
   searchTerm.value = ''
 }
@@ -180,13 +180,13 @@ watch(
     <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="grid gap-3 sm:grid-cols-3">
         <label class="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-          Category
+          Subject
           <select
-            v-model="selectedCategory"
+            v-model="selectedSubject"
             class="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-200"
           >
             <option value="all">All</option>
-            <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
+            <option v-for="subject in subjects" :key="subject" :value="subject">{{ subject }}</option>
           </select>
         </label>
         <label class="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
@@ -234,7 +234,7 @@ watch(
       >
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div class="space-y-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">{{ entry.category_name }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">{{ entry.subject_name }}</p>
             <h2 class="text-base font-semibold text-slate-900">{{ entry.prompt }}</h2>
           </div>
           <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -244,7 +244,7 @@ watch(
           </div>
         </header>
         <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          <span>Subject: {{ entry.subject || '—' }}</span>
+          <span>Subject: {{ entry.subject_label || '—' }}</span>
           <button
             class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
             type="button"

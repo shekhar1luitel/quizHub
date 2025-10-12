@@ -21,7 +21,7 @@ from app.main import app  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.bookmark import Bookmark  # noqa: E402
-from app.models.category import Category  # noqa: E402
+from app.models.subject import Subject  # noqa: E402
 from app.models.question import Question  # noqa: E402
 from app.models.user import User  # noqa: E402
 
@@ -61,7 +61,7 @@ def reset_database():
     with TestingSessionLocal() as session:
         session.query(Bookmark).delete()
         session.query(Question).delete()
-        session.query(Category).delete()
+        session.query(Subject).delete()
         session.query(User).delete()
         session.commit()
 
@@ -73,41 +73,41 @@ def seed_user_and_question():
         session.commit()
         session.refresh(user)
 
-        category = Category(
+        subject = Subject(
             name="General Knowledge",
             slug="general-knowledge",
             description="General awareness",
             icon="🌍",
         )
-        session.add(category)
+        session.add(subject)
         session.commit()
-        session.refresh(category)
+        session.refresh(subject)
 
         question = Question(
             prompt="Who is the current president?",
             explanation="The president of Nepal is Ram Chandra Poudel.",
-            subject="Civics",
+            subject_label="Civics",
             difficulty="Medium",
             is_active=True,
-            category_id=category.id,
+            subject_id=subject.id,
         )
         session.add(question)
         session.commit()
         session.refresh(question)
 
         _current_user["user"] = user
-        return user, category, question
+        return user, subject, question
 
 
 def test_bookmark_lifecycle():
     reset_database()
-    user, category, question = seed_user_and_question()
+    user, subject, question = seed_user_and_question()
 
     response = client.post("/api/bookmarks", json={"question_id": question.id})
     assert response.status_code == 201
     payload = response.json()
     assert payload["question_id"] == question.id
-    assert payload["category_name"] == category.name
+    assert payload["subject_name"] == subject.name
 
     ids_response = client.get("/api/bookmarks/ids")
     assert ids_response.status_code == 200
@@ -128,7 +128,7 @@ def test_bookmark_lifecycle():
 
 def test_duplicate_bookmark_is_idempotent():
     reset_database()
-    _, category, question = seed_user_and_question()
+    _, subject, question = seed_user_and_question()
 
     first_response = client.post("/api/bookmarks", json={"question_id": question.id})
     assert first_response.status_code == 201
@@ -139,7 +139,7 @@ def test_duplicate_bookmark_is_idempotent():
     second_created = second_response.json()
 
     assert first_created["id"] == second_created["id"]
-    assert second_created["category_name"] == category.name
+    assert second_created["subject_name"] == subject.name
 
 
 def test_bookmark_requires_question_exists():

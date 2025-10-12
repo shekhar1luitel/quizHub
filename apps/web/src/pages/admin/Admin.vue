@@ -10,7 +10,7 @@ interface AdminTotals {
   active_quizzes: number
   total_questions: number
   inactive_questions: number
-  total_categories: number
+  total_subjects: number
   total_users: number
 }
 
@@ -22,7 +22,7 @@ interface AdminRecentQuiz {
   created_at: string
 }
 
-interface AdminCategorySnapshot {
+interface AdminSubjectSnapshot {
   id: number
   name: string
   question_count: number
@@ -31,7 +31,7 @@ interface AdminCategorySnapshot {
 interface AdminOverview {
   totals: AdminTotals
   recent_quizzes: AdminRecentQuiz[]
-  top_categories: AdminCategorySnapshot[]
+  top_subjects: AdminSubjectSnapshot[]
 }
 
 const loading = ref(true)
@@ -44,7 +44,7 @@ const platformTitle = computed(() => (isSuperuser.value ? 'Platform Dashboard' :
 const platformSubtitle = computed(() =>
   isSuperuser.value
     ? 'Monitor tenant health, mail delivery, and configuration across the entire platform.'
-    : 'Oversee quiz quality, question coverage, and category balance in one place.'
+    : 'Oversee quiz quality, question coverage, and subject balance in one place.'
 )
 
 const totals = computed(() => overview.value?.totals)
@@ -93,10 +93,10 @@ const quizHealth = computed(() => {
             Bulk import
           </RouterLink>
           <RouterLink
-            :to="{ name: 'admin-categories' }"
+            :to="{ name: 'admin-subjects' }"
             class="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
           >
-            Manage categories
+            Manage subjects
           </RouterLink>
           <RouterLink
             :to="{ name: 'admin-questions' }"
@@ -132,9 +132,9 @@ const quizHealth = computed(() => {
         <p class="text-xs text-slate-500">{{ totals?.inactive_questions }} awaiting review</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Category coverage</p>
-        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ totals?.total_categories }}</p>
-        <p class="text-xs text-slate-500">Categories currently available to learners</p>
+        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Subject coverage</p>
+        <p class="mt-3 text-3xl font-semibold text-slate-900">{{ totals?.total_subjects }}</p>
+        <p class="text-xs text-slate-500">Subjects currently available to learners</p>
       </article>
       <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Quiz health</p>
@@ -152,7 +152,7 @@ const quizHealth = computed(() => {
           </div>
         </header>
         <p class="mt-4 text-sm text-slate-500">
-          Keep your library fresh by reviewing inactive questions and balancing difficulty across categories.
+          Keep your library fresh by reviewing inactive questions and balancing difficulty across subjects.
         </p>
         <RouterLink
           :to="{ name: 'admin-questions' }"
@@ -199,20 +199,20 @@ const quizHealth = computed(() => {
     <section v-if="overview" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold text-slate-900">Top categories</h2>
+          <h2 class="text-lg font-semibold text-slate-900">Top subjects</h2>
           <p class="text-xs text-slate-500">Where learners spend most of their time.</p>
         </div>
       </header>
       <div class="mt-6">
-        <p v-if="overview.top_categories.length === 0" class="text-sm text-slate-500">No categories yet. Create one to begin.</p>
+        <p v-if="overview.top_subjects.length === 0" class="text-sm text-slate-500">No subjects yet. Create one to begin.</p>
         <div v-else class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <article
-            v-for="category in overview.top_categories"
-            :key="category.id"
+            v-for="subject in overview.top_subjects"
+            :key="subject.id"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
           >
-            <p class="text-sm font-semibold text-slate-900">{{ category.name }}</p>
-            <p class="text-xs text-slate-500">{{ category.question_count }} questions available</p>
+            <p class="text-sm font-semibold text-slate-900">{{ subject.name }}</p>
+            <p class="text-xs text-slate-500">{{ subject.question_count }} questions available</p>
           </article>
         </div>
       </div>
