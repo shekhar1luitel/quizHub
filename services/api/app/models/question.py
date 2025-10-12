@@ -19,13 +19,16 @@ class Question(Base):
     prompt: Mapped[str] = mapped_column(Text(), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text())
     subject: Mapped[str | None] = mapped_column(String(100))
-    topic: Mapped[str | None] = mapped_column(String(100))
+    topic_text: Mapped[str | None] = mapped_column("topic", String(100))
     difficulty: Mapped[str | None] = mapped_column(String(50))
     text_en: Mapped[str | None] = mapped_column(Text())
     text_ne: Mapped[str | None] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
+    )
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
     )
     organization_id: Mapped[int | None] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
@@ -38,12 +41,21 @@ class Question(Base):
         "QuizQuestion", back_populates="question", cascade="all, delete-orphan"
     )
     category: Mapped["Category"] = relationship("Category", back_populates="questions")
+    _topic: Mapped["Topic | None"] = relationship("Topic", back_populates="_questions")
     organization: Mapped["Organization | None"] = relationship(
         "Organization", back_populates="questions"
     )
     bookmarks: Mapped[List["Bookmark"]] = relationship(
         "Bookmark", back_populates="question", cascade="all, delete-orphan"
     )
+
+    @property
+    def topic(self) -> "Topic | None":
+        return self._topic
+
+    @topic.setter
+    def topic(self, value: "Topic | None") -> None:
+        self._topic = value
 
 
 class Option(Base):

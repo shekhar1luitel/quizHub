@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from app.schemas.topic import TopicOut
 
 class PracticeCategorySummary(BaseModel):
     slug: str
@@ -15,6 +16,7 @@ class PracticeCategorySummary(BaseModel):
     difficulties: List[str]
     quiz_id: Optional[int] = None
     organization_id: Optional[int] = None
+    topics: List[TopicOut] = []
 
 
 class PracticeQuestionOption(BaseModel):
@@ -48,3 +50,4 @@ class PracticeCategoryDetail(BaseModel):
     difficulty: str
     questions: List[PracticeQuestion]
     organization_id: Optional[int] = None
+    topics: List[TopicOut] = []

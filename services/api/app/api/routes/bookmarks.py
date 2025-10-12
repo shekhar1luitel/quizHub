@@ -10,13 +10,16 @@ from app.api.deps import get_current_user, get_db_session
 from app.models.bookmark import Bookmark
 from app.models.category import Category
 from app.models.question import Question
+from app.models.topic import Topic
 from app.models.user import User
 from app.schemas.bookmark import BookmarkCreate, BookmarkOut
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
 
-def _bookmark_to_out(bookmark: Bookmark, question: Question, category: Category) -> BookmarkOut:
+def _bookmark_to_out(
+    bookmark: Bookmark, question: Question, category: Category, topic: Topic | None
+) -> BookmarkOut:
     return BookmarkOut(
         id=bookmark.id,
         question_id=bookmark.question_id,
@@ -26,6 +29,8 @@ def _bookmark_to_out(bookmark: Bookmark, question: Question, category: Category)
         difficulty=question.difficulty,
         category_id=category.id,
         category_name=category.name,
+        topic_id=topic.id if topic is not None else None,
+        topic_name=topic.name if topic is not None else None,
     )
 
 
@@ -37,7 +42,9 @@ def list_bookmarks(
     stmt = (
         select(Bookmark)
         .options(
-            joinedload(Bookmark.question).joinedload(Question.category)
+            joinedload(Bookmark.question)
+            .joinedload(Question.category),
+            joinedload(Bookmark.question).joinedload(Question._topic),
         )
         .where(Bookmark.user_id == current_user.id)
         .order_by(Bookmark.created_at.desc())
@@ -52,7 +59,7 @@ def list_bookmarks(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Bookmark is missing category information",
             )
-        results.append(_bookmark_to_out(bookmark, question, category))
+        results.append(_bookmark_to_out(bookmark, question, category, question.topic))
     return results
 
 
@@ -73,7 +80,7 @@ def create_bookmark(
 ) -> BookmarkOut:
     question = (
         db.query(Question)
-        .options(joinedload(Question.category))
+        .options(joinedload(Question.category), joinedload(Question._topic))
         .filter(Question.id == payload.question_id)
         .first()
     )
@@ -98,7 +105,7 @@ def create_bookmark(
     else:
         db.refresh(bookmark)
 
-    return _bookmark_to_out(bookmark, question, question.category)
+    return _bookmark_to_out(bookmark, question, question.category, question.topic)
 
 
 @router.delete("/{question_id}", status_code=status.HTTP_204_NO_CONTENT)

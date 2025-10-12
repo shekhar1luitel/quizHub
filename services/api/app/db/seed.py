@@ -473,7 +473,7 @@ class Seeder:
             else:
                 question.explanation = record.get("explanation")
                 question.subject = record.get("subject")
-                question.topic = record.get("topic")
+                question.topic_text = record.get("topic")
                 question.difficulty = record.get("difficulty")
                 question.text_en = record.get("prompt")
                 question.category_id = category.id

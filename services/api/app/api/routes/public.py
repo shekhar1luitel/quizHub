@@ -4,7 +4,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db_session
 from app.core.difficulty import difficulty_label, normalized_difficulty
@@ -17,6 +17,7 @@ from app.schemas.public import (
     PublicHomeResponse,
     PublicQuizSummary,
 )
+from app.schemas.topic import TopicOut
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -25,6 +26,7 @@ def _global_categories(db: Session, limit: int) -> List[PublicCategorySummary]:
     categories = list(
         db.scalars(
             select(Category)
+            .options(selectinload(Category.topics))
             .where(Category.organization_id.is_(None))
             .order_by(Category.name.asc())
             .limit(limit)
@@ -65,6 +67,7 @@ def _global_categories(db: Session, limit: int) -> List[PublicCategorySummary]:
                 icon=category.icon,
                 total_questions=totals,
                 difficulty=difficulty_label(normalized_list),
+                topics=[TopicOut.model_validate(topic) for topic in category.topics],
             )
         )
     return summaries

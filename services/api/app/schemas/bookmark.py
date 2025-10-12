@@ -18,5 +18,7 @@ class BookmarkOut(BaseModel):
     difficulty: str | None
     category_id: int
     category_name: str
+    topic_id: int | None
+    topic_name: str | None
 
     model_config = ConfigDict(from_attributes=True)

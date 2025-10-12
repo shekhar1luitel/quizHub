@@ -19,6 +19,7 @@ from app.schemas.practice import (
     PracticeQuestion,
     PracticeQuestionOption,
 )
+from app.schemas.topic import TopicOut
 
 router = APIRouter(prefix="/practice", tags=["practice"])
 
@@ -42,6 +43,7 @@ def list_practice_categories(
     categories = list(
         db.scalars(
             select(Category)
+            .options(selectinload(Category.topics))
             .where(
                 Category.organization_id == org_id
                 if org_id is not None
@@ -122,6 +124,7 @@ def list_practice_categories(
                 difficulties=difficulties,
                 quiz_id=quiz_map.get(category.id),
                 organization_id=category.organization_id,
+                topics=[TopicOut.model_validate(topic) for topic in category.topics],
             )
         )
 
@@ -139,6 +142,7 @@ def get_practice_category(
 
     category = db.scalar(
         select(Category)
+        .options(selectinload(Category.topics))
         .where(Category.slug == slug)
         .where(
             Category.organization_id == org_id
@@ -197,6 +201,7 @@ def get_practice_category(
         difficulty=difficulty_label(difficulties),
         questions=questions_payload,
         organization_id=category.organization_id,
+        topics=[TopicOut.model_validate(topic) for topic in category.topics],
     )
 
 
@@ -260,4 +265,5 @@ def get_bookmark_revision_set(
         difficulty=difficulty_label(difficulties),
         questions=questions_payload,
         organization_id=current_user.organization_id,
+        topics=[],
     )
