@@ -2,12 +2,13 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useLocation, useNavigate, type Location } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import type { LoginPayload } from '../types/auth'
 
 export const LoginPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-  const [username, setUsername] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +20,11 @@ export const LoginPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await login({ username, password })
+      const trimmedIdentifier = identifier.trim()
+      const payload: LoginPayload = trimmedIdentifier.includes('@')
+        ? { email: trimmedIdentifier, password }
+        : { username: trimmedIdentifier, password }
+      await login(payload)
       navigate(from, { replace: true })
     } catch (err) {
       console.error(err)
@@ -45,8 +50,8 @@ export const LoginPage = () => {
               id="username"
               className="input"
               placeholder="yourname"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
               autoComplete="username"
               required
             />
